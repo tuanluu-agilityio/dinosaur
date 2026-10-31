@@ -3,6 +3,7 @@
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
+import { join } from 'node:path';
 import { ghGraphql, ghJson, ghText } from './gh.mjs';
 
 export const PROJECT_FILE = '.agent/project.json';
@@ -22,9 +23,10 @@ export const LABELS = [
   { name: 'run-status', color: 'c5def5', description: 'Run status log' },
 ];
 
-export function loadProject() {
-  if (!existsSync(PROJECT_FILE)) throw new Error(`${PROJECT_FILE} missing — run: node scripts/agent/board.mjs setup`);
-  return JSON.parse(readFileSync(PROJECT_FILE, 'utf8'));
+export function loadProject(root = '.') {
+  const file = join(root, PROJECT_FILE);
+  if (!existsSync(file)) throw new Error(`${PROJECT_FILE} missing — run: node scripts/agent/board.mjs setup`);
+  return JSON.parse(readFileSync(file, 'utf8'));
 }
 
 function saveProject(p) {
@@ -192,7 +194,7 @@ export async function comment(p, number, body) {
 
 export async function issueComments(p, number) {
   const res = await ghJson(['issue', 'view', String(number), '--repo', p.fullRepo, '--json', 'comments']);
-  return res.comments.map((c) => c.body);
+  return res.comments.map((c) => ({ author: c.author?.login ?? null, body: c.body }));
 }
 
 export async function closeIssue(p, number, reason = 'completed') {

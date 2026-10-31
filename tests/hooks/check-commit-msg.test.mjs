@@ -38,3 +38,11 @@ describe('checkCommitMsg', () => {
     expect(checkCommitMsg('docs(docs): add runbook\n# Please enter the commit message').ok).toBe(true);
   });
 });
+
+describe('checkCommitMsg language', () => {
+  it('rejects a Vietnamese subject with the format hint', () => {
+    const r = checkCommitMsg('feat(ui): thêm nút chuyển ngôn ngữ');
+    expect(r.ok).toBe(false);
+    expect(r.error).toMatch(/English/);
+  });
+});

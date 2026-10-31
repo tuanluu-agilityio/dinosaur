@@ -21,7 +21,12 @@ export function parseLastCheckpoint(comments) {
     const text = comments[i];
     if (!text.startsWith(MARKER)) continue;
     const m = /<!-- checkpoint-data (.*) -->/.exec(text);
-    if (m) return JSON.parse(m[1]);
+    if (!m) continue;
+    try {
+      return JSON.parse(m[1]);
+    } catch {
+      // malformed data: fall back to an earlier checkpoint
+    }
   }
   return null;
 }

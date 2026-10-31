@@ -62,3 +62,10 @@ describe('blockedTasks', () => {
     expect(blockedTasks(tasks)).toEqual([{ id: 'A', by: ['D', 'E'] }]);
   });
 });
+
+describe('needs-human tasks do not hold slots', () => {
+  it('three needs-human tasks In Progress leave all slots free', () => {
+    const stuck = ['X', 'Y', 'Z'].map((id) => t(id, { status: 'In Progress', labels: ['needs-human'], heavy: true }));
+    expect(readyTasks([...stuck, t('A', { heavy: true }), t('B')])).toEqual(['A', 'B']);
+  });
+});
