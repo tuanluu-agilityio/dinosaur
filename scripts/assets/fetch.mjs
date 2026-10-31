@@ -4,6 +4,7 @@
 // The token (SKETCHFAB_API_TOKEN) is read from the environment and never logged.
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, normalize, resolve, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { unzipSync } from 'fflate';
 
 const SPECIES = ['tyrannosaurus', 'triceratops', 'ankylosaurus', 'edmontosaurus', 'pachycephalosaurus'];
@@ -14,7 +15,7 @@ export function uidFromUrl(url) {
   return m ? m[1].toLowerCase() : null;
 }
 
-/** Remove the token (and anything token-shaped after "Token ") from text before it can be logged. */
+/** Replace every occurrence of the API token with *** so text can be logged safely. */
 export function redact(text, token = process.env.SKETCHFAB_API_TOKEN) {
   let out = String(text);
   if (token) out = out.split(token).join('***');
@@ -73,7 +74,6 @@ async function main() {
   console.log(`fetched ${species} (${uid}) -> ${dest}: ${files.length} file(s)`);
 }
 
-import { fileURLToPath } from 'node:url';
 if (process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))) {
   main().catch((e) => {
     console.error(redact(e?.message ?? e));

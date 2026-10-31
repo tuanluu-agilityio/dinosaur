@@ -57,7 +57,7 @@ def push_actions_to_nla():
         arm.animation_data_create()
     used = {t.strips[0].action for t in arm.animation_data.nla_tracks if t.strips}
     for action in bpy.data.actions:
-        if action in used or action.users == 0 and not action.fcurves:
+        if action in used or (action.users == 0 and not action.fcurves):
             continue
         track = arm.animation_data.nla_tracks.new()
         track.name = action.name

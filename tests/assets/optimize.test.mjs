@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { NodeIO } from '@gltf-transform/core';
 import { EXTMeshoptCompression, KHRMeshQuantization, KHRTextureBasisu } from '@gltf-transform/extensions';
 import { MeshoptDecoder } from 'meshoptimizer';
+import { hasToktx } from '../../scripts/assets/optimize.mjs';
 
 const out = mkdtempSync(join(tmpdir(), 'optimize-'));
 const io = new NodeIO().registerExtensions([EXTMeshoptCompression, KHRMeshQuantization, KHRTextureBasisu]).registerDependencies({ 'meshopt.decoder': MeshoptDecoder });
@@ -18,7 +19,23 @@ function tris(doc) {
   return n;
 }
 
-describe('optimize.mjs', () => {
+// toktx (KTX-Software) is not installed on ubuntu-latest CI; the KTX2 suite is skipped there.
+const toktxSuite = hasToktx() ? describe : describe.skip;
+
+describe('optimize.mjs --preview (no toktx needed)', () => {
+  it('writes PNG-texture previews with the same simplification as the shipped variants', async () => {
+    const pdir = mkdtempSync(join(tmpdir(), 'optimize-prev-'));
+    execFileSync('node', ['scripts/assets/optimize.mjs', 'tests/fixtures/box-animated.glb', pdir, 'box-animated', '--preview'], { stdio: 'pipe' });
+    const pio = new NodeIO();
+    const ph = await pio.read(join(pdir, 'box-animated.high.preview.glb'));
+    const pl = await pio.read(join(pdir, 'box-animated.low.preview.glb'));
+    expect(tris(pl)).toBeLessThanOrEqual(tris(ph) * 0.5);
+    for (const t of pl.getRoot().listTextures()) expect(t.getMimeType()).toBe('image/png');
+    expect(pl.getRoot().listAnimations().map((a) => a.getName()).sort()).toEqual(['idle', 'walk']);
+  }, 60000);
+});
+
+toktxSuite('optimize.mjs (requires toktx)', () => {
   let high;
   let low;
   beforeAll(async () => {
@@ -46,6 +63,12 @@ describe('optimize.mjs', () => {
     expect(names(high)).toEqual(['idle', 'walk']);
     expect(names(low)).toEqual(names(high));
   });
+  it('preview low has the same triangle count as low.glb', async () => {
+    const pdir = mkdtempSync(join(tmpdir(), 'optimize-prev-'));
+    execFileSync('node', ['scripts/assets/optimize.mjs', 'tests/fixtures/box-animated.glb', pdir, 'box-animated', '--preview'], { stdio: 'pipe' });
+    const pl = await new NodeIO().read(join(pdir, 'box-animated.low.preview.glb'));
+    expect(tris(pl)).toBe(tris(low));
+  }, 60000);
   it('uses meshopt compression', () => {
     expect(high.getRoot().listExtensionsUsed().map((e) => e.extensionName)).toContain('EXT_meshopt_compression');
   });
