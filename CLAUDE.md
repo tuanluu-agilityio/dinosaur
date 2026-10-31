@@ -28,6 +28,17 @@ Your GitHub issue is your brief: goal, steps, allowed files, ADRs, acceptance. R
    `node scripts/agent/board.mjs checkpoint <issue> --done "<step done>" --next "<next step>"`
    A disconnect must never cost more than one step.
 8. **Do not relax rubrics** or acceptance criteria to pass.
+9. **Code tasks:** also read `## Shared interfaces` in `docs/superpowers/plans/2026-10-31-dinosaur-explorer.md` — exact names/signatures you implement or consume.
+
+## Evidence (the worker publishes it; reviewers judge only what is published)
+
+Visual/perf work needs evidence files (rubric lists what). Name them `task-<n>-<what>.<ext>` and upload to the `review-artifacts` pre-release:
+```
+gh release view review-artifacts || gh release create review-artifacts --prerelease --title "Review artifacts" --notes "Evidence for agent PR reviews"
+gh release upload review-artifacts <files> --clobber
+```
+URL: `https://github.com/tuanluu-agilityio/dinosaur/releases/download/review-artifacts/<file>`. Put every URL in your report.
+Reviewers cannot watch video: for every MP4 also upload a frame strip `ffmpeg -i x.mp4 -vf "fps=2,scale=480:-1,tile=5x2" -frames:v 1 x-strip.png`.
 
 ## Report format (≤ 15 lines, last message)
 

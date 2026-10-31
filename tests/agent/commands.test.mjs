@@ -103,7 +103,8 @@ describe('move', () => {
   it('Review → In Progress counts a new attempt (rework)', async () => {
     const t = task('A-T1');
     const { commands, world } = fakeWorld({ tasks: [t], issues: [openIssue(t, 5)], items: [boardItem(5, { status: 'Review', attempt: 1 })] });
-    await commands.move({ args: ['5', 'In', 'Progress'] });
+    const r = await commands.move({ args: ['5', 'In', 'Progress'] });
+    expect(r.attempt).toBe(2);
     expect(world.items[0].attempt).toBe(2);
     expect(world.items[0].status).toBe('In Progress');
   });

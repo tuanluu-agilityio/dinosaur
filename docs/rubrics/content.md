@@ -16,8 +16,8 @@ Grade every line PASS / FAIL. Check claims against the cited sources yourself (o
 |---|---|
 | L1 | `vi` and `en` say the same thing (no missing sentence in either) |
 | L2 | Vietnamese reads naturally (not word-for-word translation), correct diacritics |
-| L3 | Terminology follows the glossary below; scientific names in italics in UI, never translated |
-| L4 | Each section 120–200 words; suitable for adult enthusiasts, no jargon without a short explanation |
+| L3 | Terminology follows the glossary below; scientific names never translated (italics are checked in UI QA, not here) |
+| L4 | Each `en` section 120–200 words; each `vi` section 160–300 syllables (whitespace-separated); suitable for adult enthusiasts, no jargon without a short explanation |
 
 ## Glossary (vi ↔ en)
 | en | vi |

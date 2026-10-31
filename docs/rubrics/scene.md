@@ -1,6 +1,6 @@
 # Rubric — forest scene (visual-judge, perf-engineer)
 
-Grade PASS / FAIL with evidence. Evidence: screenshots per tier (desktop 1920×1080 and phone proxy 390×844), a 10 s screen recording of the intro, and `test-results/perf.json`.
+Grade PASS / FAIL with evidence; lines the task cannot affect are `N/A (<reason>)` and do not block (e.g. S1 in a camera-only task). Evidence (only what the task can show): screenshots per tier (desktop 1920×1080 and phone proxy 390×844), a 10 s recording of the intro **with its frame strip PNG**, and `test-results/perf.json`.
 
 ## Scientific
 | # | Check |

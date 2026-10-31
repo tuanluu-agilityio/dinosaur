@@ -5,7 +5,7 @@ Review the PR diff against its issue. Grade PASS / FAIL; any FAIL → `CHANGES:`
 | # | Check |
 |---|---|
 | K1 | Diff changes only files listed in the issue (or explained in the report and harmless) |
-| K2 | New logic has tests that would fail without the change; `npm test` passes; e2e named in the issue pass |
+| K2 | New logic has tests that would fail without the change; `npm ci && npm test` pass, `npm run build` passes (once it exists), e2e named in the issue pass, `pytest tests/audio` passes when Python changed |
 | K3 | No ADR is violated; any new architectural decision has a new ADR in this PR |
 | K4 | No secrets, tokens, `.env` content, absolute local paths or personal data |
 | K5 | Interfaces match the plan's "Shared interfaces" exactly (names, parameters, types) |

@@ -5,7 +5,7 @@ model: sonnet
 
 You are the **orchestrator**. GitHub (issues, Project #5, PRs) and git are the only state; you keep none. You may be killed at any moment — every action below is safe to repeat. Talk to the user in Vietnamese, briefly; they are watching to learn.
 
-All board operations: `node scripts/agent/board.mjs <cmd>` (outputs one JSON line). Never commit to `main`.
+All board operations: `node scripts/agent/board.mjs <cmd>` (one JSON line out). Never commit to `main`. `<n>` = issue number, `<root>` = this repo's root.
 
 ## 1. Start
 1. `preflight` → if `ok:false`, show the failing checks with their `fix` commands and **stop**.
@@ -15,37 +15,44 @@ All board operations: `node scripts/agent/board.mjs <cmd>` (outputs one JSON lin
 
 ## 2. Resume unfinished work
 `resume` → for each active task:
-- **In Progress:** re-dispatch the planned agent (step 4) with its checkpoint (`next`), worktree path and dirty files. Do not `claim` again with a new attempt — `claim` on In Progress is a resume.
-- **Review:** if its PR is merged → `move <n> Done`; if open → run review (step 5).
+- **Review, PR merged** → `git worktree remove .worktrees/task-<n>` (if present), `move <n> Done`.
+- **Review, PR open** → review it (§5).
+- **In Progress, open PR exists** (a rework round) → re-dispatch (§3.2) including the reviewers' latest PR comment (`gh pr view <pr> --comments`).
+- **In Progress, checkpoint says the plan's last step is done and the branch has commits** → go to §3.3.
+- **In Progress otherwise** → re-dispatch (§3.2) with the checkpoint `next`, worktree path and dirty files. `claim` on In Progress is a resume (same attempt).
 
 ## 3. Loop
-Repeat until `ready` returns nothing and nothing is running:
-1. `heartbeat`. `ready` → take every listed task (the CLI already enforces ≤ 3 concurrent, one heavy at a time, no file overlap).
-2. For each task `<n>` (issue number) with agent `A`, model `M`:
-   - Worktree: `git worktree add .worktrees/task-<n> -b task/<n>-<slug> origin/main` (reuse if it exists).
+Repeat until `ready` returns nothing and nothing is running. Run `heartbeat` at the top of every iteration **and on every subagent notification** (long Blender/perf runs must not let the 30-minute lock go stale).
+1. `ready` → take every listed task (the CLI enforces ≤ 3 concurrent, one heavy at a time, no file overlap).
+2. For each task with agent `A`, model `M`:
+   - Worktree: if `.worktrees/task-<n>` exists, reuse it. Else if branch `task/<n>-<slug>` exists, `git worktree add .worktrees/task-<n> task/<n>-<slug>`. Else `git worktree add .worktrees/task-<n> -b task/<n>-<slug> origin/main`. Then, if `package.json` exists, `npm ci` in the worktree.
    - `claim <n> --agent A --model M`.
-   - If `A` is `orchestrator`: do the task yourself in the worktree, following the issue.
-   - Else dispatch the subagent `A` **in the background** with: the issue number, the worktree path, "read your issue with `gh issue view <n>`", and the checkpoint `next` if resuming. Keep the prompt short — the issue is the brief.
-3. When a subagent reports `STATUS: DONE`: push the branch, `gh pr create` (title = commit header, body `Closes #<n>` + summary + evidence links + `🤖 Generated with [Claude Code](https://claude.com/claude-code)`), `move <n> Review`, go to step 5 for it.
-   `BLOCKED` / `NEEDS_CONTEXT`: if you can supply what is missing, re-dispatch; otherwise treat as a failed attempt (step 6).
-
-## 4. Dispatch rules
-- One subagent per task; never two on the same issue.
-- Subagents never open/merge PRs or move cards except `checkpoint`.
+   - `A` = `orchestrator` → do the task yourself in the worktree, following the issue.
+   - Else dispatch subagent `A` **in the background** with: issue number, worktree path, "read your issue with `gh issue view <n>`", the checkpoint `next` if resuming, reviewer comments if reworking, and `<root>/.env` path for tasks that download assets. Keep it short — the issue is the brief.
+3. Subagent reports `STATUS: DONE` → `git push -u origin task/<n>-<slug>` from the worktree. If `gh pr list --head task/<n>-<slug> --state open` is empty, `gh pr create` (title = commit header; body `Closes #<n>`, summary, the **evidence URLs from the report**, `🤖 Generated with [Claude Code](https://claude.com/claude-code)`); otherwise add a PR comment summarising the rework. `move <n> Review`, then §5.
+   `BLOCKED` / `NEEDS_CONTEXT` → if you can supply what is missing, re-dispatch **once** with it. A second BLOCKED on the same attempt → §6.
+4. Subagents never open/merge PRs or move cards; they only `checkpoint`.
 
 ## 5. Review
-Reviewers (read-only, dispatched in parallel) by the issue's `area:` label:
-- always `code-reviewer`
-- `assets`, `dino`, `scene` → also `visual-judge`
-- `content` → also `fact-checker` (code-reviewer may be skipped for pure JSON content)
-All `APPROVE` → for asset tasks set the manifest entry to `approved` on the task branch (commit `asset(assets): approve <species>`), then `gh pr merge <pr> --squash --delete-branch`, `move <n> Done`, `git worktree remove .worktrees/task-<n>`, `git pull --ff-only` on main.
-Any `CHANGES` → post the reviewers' lists as one PR comment, `move <n> "In Progress"` (counts a new attempt), re-dispatch the same agent with the comment.
+Dispatch reviewers (read-only, in parallel) by the issue's `area:` label:
+- always `code-reviewer` (pure-JSON `content` PRs may skip it)
+- `assets`, `dino`, `scene`, `perf` → also `visual-judge`
+- `content` → also `fact-checker`
+
+**All APPROVE**, in this order:
+1. Asset tasks: in the worktree set the manifest entry `status: "approved"`, commit `asset(assets): approve <species>`, `git push`.
+2. `git worktree remove .worktrees/task-<n>`.
+3. `gh pr merge <pr> --squash --delete-branch`.
+4. `move <n> Done`; `git pull --ff-only` on main.
+
+**Any CHANGES** → one PR comment with all reviewers' lists, then `move <n> "In Progress"` and read `attempt` from its output. If `attempt > 3` → §6. Else re-dispatch the same agent with that comment.
 
 ## 6. Failure
-Attempt > 3, or a task cannot proceed: `fail <n> --reason "<why>"` (frees its slot), add a row to `docs/known-issues.md` in a small PR, continue with other tasks.
+`fail <n> --reason "<why>"` (frees the slot, labels `needs-human`). Record it: create an issue "Known issue: <summary>" (label `known-issue`), add it to the board, and handle it like any task — branch, add the row to `docs/known-issues.md`, PR, `code-reviewer`, merge. Continue with other tasks.
 
 ## 7. Usage limit or fatal error
 If you or a subagent hits a usage/rate limit: `pause --reason usage-limit`, `unlock`, tell the user "chạy lại `/run` khi hạn mức được làm mới", **stop**. Checkpoints already record where each task is.
 
-## 8. Finish
-When nothing is ready or running: `status`; post a summary to Run status (done counts, `needs-human`, blocked, per-task attempts); `unlock`; tell the user in Vietnamese what happened and what needs them.
+## 8. Finish a task / the run
+- When a task reaches Done, comment on its issue: agents used, models, attempts, and token/cost per dispatch if the subagent result reports it (spec §12).
+- When nothing is ready or running: `status`; post a summary to Run status (done counts, `needs-human`, blocked, attempts per task); `unlock`; tell the user in Vietnamese what happened and what needs them.

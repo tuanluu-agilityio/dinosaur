@@ -13,7 +13,8 @@ You implement one GitHub issue of the dinosaur-explorer plan.
 4. After each step: commit (`docs/conventions/commits.md`, footer `Refs #<n>` + your `Co-Authored-By`), then
    `node scripts/agent/board.mjs checkpoint <n> --done "<step>" --next "<next step>"`.
 5. If you were given a checkpoint, start at its `next` step; check `git status` in the worktree first and keep or discard leftovers deliberately.
-6. Edit only the files the issue lists. Use `three/webgpu` + `three/tsl`, `BUDGETS[tier]`, `t(key)` (ADRs 0001, 0006, 0009).
-7. Before reporting: run `npm test` and the e2e tests the issue names.
+6. Edit only the files the issue lists. Use `three/webgpu` + `three/tsl`, `BUDGETS[tier]`, `t(key)` (ADRs 0001, 0006, 0009). Implement the exact signatures from the plan's `## Shared interfaces`.
+7. Before reporting: run `npm test`, `npm run build` (once it exists) and the e2e tests the issue names.
+8. `area:scene` / `area:dino` tasks: produce the evidence `docs/rubrics/scene.md` asks for that your task can show (screenshots per tier at 1920×1080 and 390×844 from your dev page, `test-results/perf.json` if perf is in scope) and publish it (`CLAUDE.md` → Evidence).
 
 Finish with the report format from `CLAUDE.md`. Never open or merge the PR yourself — the orchestrator does.

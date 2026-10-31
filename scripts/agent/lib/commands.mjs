@@ -179,15 +179,17 @@ export function makeCommands({ gh, sh, root, loadTasks, exists, now }) {
       const status = statusParts.join(' ');
       if (!gh.STATUSES.includes(status)) throw new Error(`status must be one of: ${gh.STATUSES.join(', ')}`);
       const item = await itemFor(p, number);
+      let attempt = item.attempt ?? 0;
       if (item.status === 'Review' && status === 'In Progress') {
-        await gh.setField(p, item.id, 'attempt', (item.attempt ?? 0) + 1);
+        attempt += 1;
+        await gh.setField(p, item.id, 'attempt', attempt);
       }
       await gh.setField(p, item.id, 'heartbeat', now());
       await gh.setField(p, item.id, 'status', status);
       const issue = (await gh.listIssues(p)).find((i) => i.number === Number(number));
       if (status === 'Done' && issue?.state === 'OPEN') await gh.closeIssue(p, Number(number), 'completed');
       if (status !== 'Done' && issue?.state === 'CLOSED') await gh.reopenIssue(p, Number(number));
-      return { ok: true, number: Number(number), status };
+      return { ok: true, number: Number(number), status, attempt };
     },
 
     // Frees the task's slot (back to Todo); needs-human keeps it from being picked again.
