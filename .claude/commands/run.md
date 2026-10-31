@@ -15,8 +15,9 @@ All board operations: `node scripts/agent/board.mjs <cmd>` (one JSON line out). 
 
 ## 2. Resume unfinished work
 `resume` → for each active task:
+- **`attempt > 3`** (killed between `move` and `fail`) → §6 first; nothing else.
 - **Review, PR merged** → `git worktree remove .worktrees/task-<n>` (if present), `move <n> Done`.
-- **Review, PR open** → review it (§5).
+- **Review, PR open** → ensure the worktree exists (re-add it by the §3.2 rule), then review it (§5).
 - **In Progress, open PR exists** (a rework round) → re-dispatch (§3.2) including the reviewers' latest PR comment (`gh pr view <pr> --comments`).
 - **In Progress, checkpoint says the plan's last step is done and the branch has commits** → go to §3.3.
 - **In Progress otherwise** → re-dispatch (§3.2) with the checkpoint `next`, worktree path and dirty files. `claim` on In Progress is a resume (same attempt).
@@ -34,21 +35,21 @@ Repeat until `ready` returns nothing and nothing is running. Run `heartbeat` at 
 4. Subagents never open/merge PRs or move cards; they only `checkpoint`.
 
 ## 5. Review
-Dispatch reviewers (read-only, in parallel) by the issue's `area:` label:
+Ensure `.worktrees/task-<n>` exists (§3.2 rule). Dispatch reviewers (read-only, in parallel) with the issue number, PR number, worktree path and `<root>`, by the issue's `area:` label:
 - always `code-reviewer` (pure-JSON `content` PRs may skip it)
 - `assets`, `dino`, `scene`, `perf` → also `visual-judge`
 - `content` → also `fact-checker`
 
 **All APPROVE**, in this order:
 1. Asset tasks: in the worktree set the manifest entry `status: "approved"`, commit `asset(assets): approve <species>`, `git push`.
-2. `git worktree remove .worktrees/task-<n>`.
-3. `gh pr merge <pr> --squash --delete-branch`.
+2. `git worktree remove .worktrees/task-<n>` (if it refuses because of untracked leftovers, check they are not deliverables, then `--force`).
+3. `gh pr merge <pr> --squash --delete-branch`. If the merge fails (conflict, behind main): re-add the worktree, `git rebase origin/main`, `git push --force-with-lease`, and review again (§5) — this does not count as a new attempt.
 4. `move <n> Done`; `git pull --ff-only` on main.
 
 **Any CHANGES** → one PR comment with all reviewers' lists, then `move <n> "In Progress"` and read `attempt` from its output. If `attempt > 3` → §6. Else re-dispatch the same agent with that comment.
 
 ## 6. Failure
-`fail <n> --reason "<why>"` (frees the slot, labels `needs-human`). Record it: create an issue "Known issue: <summary>" (label `known-issue`), add it to the board, and handle it like any task — branch, add the row to `docs/known-issues.md`, PR, `code-reviewer`, merge. Continue with other tasks.
+`fail <n> --reason "<why>"` (frees the slot, labels `needs-human`). Record it: create an issue "Known issue: <summary>" (label `known-issue`; body lists the only file it may change: `docs/known-issues.md`), add it to the board, and handle it like any task — branch, add the row to `docs/known-issues.md`, PR, `code-reviewer`, merge. Continue with other tasks.
 
 ## 7. Usage limit or fatal error
 If you or a subagent hits a usage/rate limit: `pause --reason usage-limit`, `unlock`, tell the user "chạy lại `/run` khi hạn mức được làm mới", **stop**. Checkpoints already record where each task is.

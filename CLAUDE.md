@@ -38,7 +38,7 @@ gh release view review-artifacts || gh release create review-artifacts --prerele
 gh release upload review-artifacts <files> --clobber
 ```
 URL: `https://github.com/tuanluu-agilityio/dinosaur/releases/download/review-artifacts/<file>`. Put every URL in your report.
-Reviewers cannot watch video: for every MP4 also upload a frame strip `ffmpeg -i x.mp4 -vf "fps=2,scale=480:-1,tile=5x2" -frames:v 1 x-strip.png`.
+Reviewers cannot watch video: for every MP4 also upload a frame strip `ffmpeg -i x.mp4 -vf "fps=4,scale=480:-1,tile=5x4" -frames:v 1 x-strip.png`.
 
 ## Report format (≤ 15 lines, last message)
 

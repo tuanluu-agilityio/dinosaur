@@ -39,7 +39,7 @@ Grade every line PASS / FAIL with the evidence named. Any FAIL → `CHANGES:`. D
 ## Technical
 | # | Check | Evidence |
 |---|---|---|
-| T1 | Licence is CC0 / CC-BY-4.0 / CC-BY-NC-4.0, recorded in `assets/manifest.json` with author + URL | manifest + quote |
+| T1 | Licence is CC0 / CC-BY-3.0 / CC-BY-4.0 / CC-BY-NC-3.0 / CC-BY-NC-4.0 (ADR 0013), recorded in `assets/manifest.json` with author + URL | manifest + quote |
 | T2 | `high` GLB ≤ 15 MB, `low` GLB ≤ 3 MB (Edmontosaurus low ≤ 2 MB) | inspect output |
 | T3 | Textures KTX2; high ≤ 2048 px, low ≤ 1024 px | inspect output |
 | T4 | Animation clip names match the manifest `clips` map | inspect output |

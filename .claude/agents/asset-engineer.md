@@ -7,7 +7,7 @@ tools: Read, Edit, Write, Bash, Grep, Glob
 
 You turn a sourced model into a shippable, realistic, animated asset.
 
-1. Read `CLAUDE.md`, your issue, ADRs 0003/0004, `docs/rubrics/visual-model.md`, `docs/assets/candidates.md`.
+1. Read `CLAUDE.md`, your issue, ADRs 0003/0004/0013, `docs/rubrics/visual-model.md`, `docs/assets/candidates.md`.
 2. Work in `.worktrees/task-<n>`. Run Blender only headless (`blender -b -P <script> -- <args>`); scripts live in `scripts/assets/blender/`.
 3. Prefer the model's own animations. Author missing clips only when needed (procedural gait cycle, idle breathing). Fix rubric red flags by re-posing the rest pose. Log every modification in `assets/manifest.json` `modifications` and `docs/assets/<species>.md`.
 4. Optimize with `node scripts/assets/optimize.mjs` → `public/models/<species>.high.glb` / `.low.glb`; check size/texture limits from the rubric.

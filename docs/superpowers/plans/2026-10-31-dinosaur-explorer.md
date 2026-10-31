@@ -137,7 +137,7 @@ depends: [P0-T07]
 heavy: false
 files: [docs/assets/candidates.md, assets/manifest.json]
 ```
-Read: ADR 0003, 0004; `docs/rubrics/visual-model.md`.
+Read: ADR 0003, 0004, 0013; `docs/rubrics/visual-model.md`.
 
 - [ ] **Step 1:** For each species, search Sketchfab (API `GET /v3/search?type=models&downloadable=true&q=<name>` with `SKETCHFAB_API_TOKEN`), filter licences to CC0 / CC-BY / CC-BY-NC. Also check the leads in the spec's research (Sketchfab "Prehistoric Planet T-rex", "animated T-rex biting loop").
 - [ ] **Step 2:** For each species list ≤ 4 candidates in `docs/assets/candidates.md`: url, author, licence, rigged (y/n), animation clip names, face/vertex count, texture sizes, thumbnail url, obvious rubric red flags. Rank; mark top pick.

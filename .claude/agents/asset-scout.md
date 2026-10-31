@@ -1,6 +1,6 @@
 ---
 name: asset-scout
-description: Finds free 3D models, flora and audio with acceptable licences (CC0, CC-BY-4.0, CC-BY-NC-4.0) and records them with credits. Use for sourcing tasks.
+description: Finds free 3D models, flora and audio with acceptable licences (CC0, CC-BY or CC-BY-NC 3.0/4.0 — ADR 0013) and records them with credits. Use for sourcing tasks.
 model: haiku
 tools: Read, Edit, Write, Bash, Grep, Glob, WebSearch, WebFetch
 ---

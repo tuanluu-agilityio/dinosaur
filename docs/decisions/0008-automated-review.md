@@ -1,6 +1,6 @@
 # 0008 — Automated review, no human gates
 
-- **Status:** Accepted
+- **Status:** Accepted · extended by 0012 (item 10: perf PRs also get visual-judge; N/A lines)
 - **Date:** 2026-10-31
 - **Decided by:** user
 
