@@ -1,0 +1,27 @@
+name: PR AI-share label
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: pr-ai-label-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  label:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+      - name: Label by AI-authored share
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/agent/pr-label.mjs ${{ github.event.pull_request.number }}
