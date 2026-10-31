@@ -1,0 +1,86 @@
+{
+  "id": "ankylosaurus",
+  "scientificName": "Ankylosaurus magniventris",
+  "commonName": {
+    "vi": "Khủng long giáp Ankylosaurus",
+    "en": "Ankylosaurus"
+  },
+  "quickFacts": {
+    "lengthM": [
+      6,
+      8
+    ],
+    "massT": [
+      4.8,
+      7.9
+    ],
+    "periodMa": [
+      66,
+      68
+    ],
+    "diet": "herbivore"
+  },
+  "sections": {
+    "behavior": {
+      "vi": "Ankylosaurus sống ở miền tây Bắc Mỹ vào cuối kỷ Phấn Trắng, thuộc tầng Maastricht, khoảng 68 đến 66 triệu năm trước. Hóa thạch của nó được tìm thấy ở hệ tầng Hell Creek (bang Montana) và hệ tầng Scollard (tỉnh Alberta). Đây là loài động vật ăn cỏ, và một nghiên cứu năm 2019 về cả quần xã khủng long ăn cỏ cỡ lớn cho rằng các khủng long giáp (nhóm khủng long bọc giáp xương) chỉ ăn ở độ cao dưới khoảng một mét so với mặt đất. Hồ sơ hóa thạch của nó rất rời rạc. Arbour và Mallon chỉ ghi nhận một nhúm mẫu vật, và nghiên cứu năm 2019 xếp nó vào nhóm rất hiếm, dưới năm mẫu vật. Chưa có bộ xương nào hoàn chỉnh. Vùng mũi và răng của nó khác với các họ hàng, nên các tác giả gợi ý rằng cách ăn cũng có thể đã khác, nhưng đó mới chỉ là giả thuyết cần thêm hóa thạch để kiểm chứng.",
+      "en": "Ankylosaurus lived in western North America at the very end of the Cretaceous, in the Maastrichtian, about 68 to 66 million years ago. Its fossils come from the Hell Creek Formation of Montana and the Scollard Formation of Alberta. It was a herbivore, and a 2019 study of the whole community of large plant eaters concluded that ankylosaurs (armoured dinosaurs) fed only below about one metre above the ground. Its fossil record is fragmentary. Arbour and Mallon describe only a handful of specimens, and the 2019 study ranks it as very rare, with fewer than five specimens. No complete skeleton is known. Its nasal region and teeth differ from those of its relatives, so the authors suggest that its feeding may have differed too, but this is a hypothesis that needs more fossils to test."
+    },
+    "anatomy": {
+      "vi": "Arbour và Mallon ước tính mẫu vật AMNH 5214 dài khoảng 6,02 đến 7,95 mét, và cho rằng những cá thể lớn nhất có lẽ dài khoảng 8 mét, chứ không phải gần 10 mét như đôi khi được đề xuất. Các ước tính khối lượng dao động từ khoảng 4,8 đến 7,9 tấn và đều dựa trên bộ xương không đầy đủ. Đây là một loài bốn chân to bè, phủ phiến xương da (các tấm xương nằm trong da) với nhiều hình dạng và kích cỡ. Đuôi cứng, phần cuối có các phiến xương da lớn tạo thành chùy đuôi. Ở hầu hết khủng long giáp, các gai thần kinh của đốt sống ở cán chùy tạo góc khoảng 22 độ, còn ở Ankylosaurus góc này khoảng 60 độ nên cán có dạng chữ U. Nghiên cứu năm 2017 đề xuất cách sắp xếp mới cho lớp giáp. Cách phục dựng này có thể còn thay đổi khi có thêm mẫu vật.",
+      "en": "Arbour and Mallon estimated the specimen AMNH 5214 at about 6.02 to 7.95 metres long, and judged that the largest individuals probably reached about 8 metres rather than the nearly 10 metres sometimes suggested. Mass estimates run from roughly 4.8 to 7.9 tonnes and all rest on incomplete skeletons. It was a broad, bulky quadruped covered in osteoderms (bony plates in the skin) of many shapes and sizes. The tail was stiff, and enlarged osteoderms at its tip formed a tail club. In most ankylosaurines the neural spines of the vertebrae in the club handle diverge at about 22 degrees, but in Ankylosaurus they diverge at about 60 degrees, which makes the handle U-shaped. The 2017 study proposed a new arrangement of the armour. This restoration may change as more specimens are found."
+    },
+    "huntingOrDefense": {
+      "vi": "Ankylosaurus là loài ăn cỏ nên không săn mồi. Điều đáng bàn là cách nó tự vệ. Chùy đuôi được mô tả là cấu trúc có thể đã được dùng làm vũ khí, tức là mới chỉ ở mức khả năng, chưa phải điều đã được chứng minh. Mẫu vật AMNH 5214 là một cá thể gần trưởng thành với núm chùy rộng khoảng 450 milimét, nhỏ hơn các núm rộng 572 đến 620 milimét của những khủng long giáp họ hàng. Các tác giả không nói rõ sự khác biệt này đến từ tuổi hay từ loài. Họ cũng nêu rằng kích thước cơ thể tăng lên có thể đã buộc hình dạng chùy phải thay đổi. Vì vậy, nên hình dung chùy đuôi cùng lớp giáp như vũ khí và áo giáp khả dĩ, chứ không phải bằng chứng về một trận đánh cụ thể nào. Chùy của mẫu AMNH 5214 cũng là chùy duy nhất được biết từ hệ tầng Scollard, nên mọi nhận định về chùy đều dựa trên rất ít mẫu vật.",
+      "en": "Ankylosaurus was a herbivore, so it did not hunt. The question is how it defended itself. The tail club is described as a structure that may have been used as a weapon, which is a possibility rather than something proved. The specimen AMNH 5214 is a subadult whose club knob is about 450 millimetres wide, smaller than the knobs of 572 to 620 millimetres in related ankylosaurs. The authors do not say whether this difference reflects age or species. They also note that increased body size may have forced a change in club shape. So picture the club and the armour together as a possible weapon and protection, not as evidence of any particular fight. The club of AMNH 5214 is also the only known tail club from the Scollard Formation, so any statement about the club rests on very few specimens."
+    },
+    "discovery": {
+      "vi": "Barnum Brown của Bảo tàng Lịch sử Tự nhiên Hoa Kỳ mô tả và đặt tên Ankylosaurus magniventris năm 1908. Mẫu chuẩn AMNH 5895 gồm một phần hộp sọ và phần thân sau đầy đủ nhất trong các mẫu đã biết, và nó đến từ hệ tầng Hell Creek ở bang Montana. Năm 1910, việc tìm thấy mẫu AMNH 5214 tại hệ tầng Scollard ở Alberta cho bằng chứng đầu tiên về chùy đuôi của Ankylosaurus. Carpenter mô tả lại loài này năm 2004, và Arbour cùng Mallon xem xét lại năm 2017 cùng với các mẫu vật mới được nhận diện. Tuy vậy, sau hơn một thế kỷ, số mẫu vật vẫn chỉ là một nhúm, nên nhiều đặc điểm của loài này vẫn chưa rõ. Hai mẫu vật này đến từ hai hệ tầng khác nhau, Hell Creek ở Montana và Scollard ở Alberta, và cá thể ở Scollard là một cá thể gần trưởng thành, tức là chưa lớn hoàn toàn.",
+      "en": "Barnum Brown of the American Museum of Natural History described and named Ankylosaurus magniventris in 1908. The type specimen, AMNH 5895, includes a partial skull and the most complete postcranium (the skeleton behind the head) of any known specimen, and it comes from the Hell Creek Formation of Montana. In 1910 the discovery of AMNH 5214 in the Scollard Formation of Alberta gave the first evidence for the tail club of Ankylosaurus. Carpenter redescribed the species in 2004, and Arbour and Mallon reviewed it in 2017 together with newly identified specimens. Even so, after more than a century the record is still only a handful of specimens, so many features of the animal remain unclear. These two specimens come from different formations, Hell Creek in Montana and Scollard in Alberta, and the Scollard animal is a subadult, meaning not yet fully grown."
+    }
+  },
+  "contested": [
+    {
+      "vi": "Kích thước: chiều dài cực đại ước tính khoảng 8 mét, không phải gần 10 mét, và khối lượng chỉ là ước tính dựa trên bộ xương không đầy đủ.",
+      "en": "Size: the largest individuals are estimated at about 8 metres rather than nearly 10, and mass is only an estimate based on incomplete skeletons."
+    },
+    {
+      "vi": "Chùy đuôi: có thể đã được dùng làm vũ khí, nhưng điều này chưa được chứng minh.",
+      "en": "Tail club: it may have been used as a weapon, but this has not been demonstrated."
+    },
+    {
+      "vi": "Cách ăn: vùng mũi và răng khác với họ hàng, nhưng việc điều đó phản ánh chế độ ăn khác hay không vẫn là giả thuyết.",
+      "en": "Feeding: the nasal region and teeth differ from relatives, but whether this reflects a different diet is only a hypothesis."
+    },
+    {
+      "vi": "Cách sắp xếp lớp giáp: nghiên cứu năm 2017 đề xuất cách sắp xếp phiến xương da mới, và cách phục dựng này có thể còn thay đổi.",
+      "en": "Armour layout: the 2017 study proposed a new arrangement of osteoderms, and this restoration may still change."
+    }
+  ],
+  "sources": [
+    {
+      "title": "Unusual cranial and postcranial anatomy in the archetypal ankylosaur Ankylosaurus magniventris (FACETS)",
+      "url": "https://doi.org/10.1139/facets-2017-0063",
+      "year": 2017
+    },
+    {
+      "title": "Ankylosaurid dinosaur tail clubs evolved through stepwise acquisition of key features (Journal of Anatomy)",
+      "url": "https://doi.org/10.1111/joa.12363",
+      "year": 2015
+    },
+    {
+      "title": "Competition structured a Late Cretaceous megaherbivorous dinosaur assemblage (Scientific Reports)",
+      "url": "https://doi.org/10.1038/s41598-019-51709-5",
+      "year": 2019
+    },
+    {
+      "title": "Redescription of Ankylosaurus magniventris Brown 1908 (Ankylosauridae) from the Upper Cretaceous of the Western Interior of North America (Canadian Journal of Earth Sciences)",
+      "url": "https://doi.org/10.1139/e04-022",
+      "year": 2004
+    },
+    {
+      "title": "The Ankylosauridae, a new family of armored dinosaurs from the Upper Cretaceous (Bulletin of the American Museum of Natural History)",
+      "url": "http://hdl.handle.net/2246/1435",
+      "year": 1908
+    }
+  ]
+}
