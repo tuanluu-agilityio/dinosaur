@@ -58,11 +58,13 @@ Rejected (Tyrannosaurus):
 1. **TOP PICK: `87527079bad44917ab1b98a456b46c7e` "Triceratops dinosaur"** (added round 2, replaces `67bccb40…`)
    - URL: https://sketchfab.com/3d-models/triceratops-dinosaur-87527079bad44917ab1b98a456b46c7e
    - Author: `wojciechmiedziocha`. Description: "Model made in blender 2.8 PBR textures. Extra files include hi poly sculpt in blender 2.8 file", with a YouTube timelapse of the work and an ArtStation page. This is a self-declared own-work model.
+   - Supporting evidence (round 3, optional item): YouTube https://www.youtube.com/watch?v=aUP4SPlmhak, titled "Triceratops modeling blender 2.8 timelapse". Title matches the description's Blender 2.8 pipeline. The page did not expose the channel name or the title card in the automated fetch, so the uploader link is still based on the description and the catalogue, not on the video's own credits.
    - Upstream check (round 2): catalogue is his own work and unrelated props (`axe_new_t1`, `Iron Axe`, `Electro Ride car`, `Stone hammer textured in InstaMat`, `Heavy helmets skins for Gloria Victis game` (a skin he made for a game, not a rip of one), `Space Roots set`). No game-rip or film-rip entries. Cleared.
    - Licence: `CC Attribution` (CC-BY-4.0), `license.url` `http://creativecommons.org/licenses/by/4.0/`.
    - Rigged: n. Static: 0 skins, 0 clips. Needs rig + idle/walk.
-   - Polycount: 12,560 faces, 6,294 verts (API). **Low-ish for a 1 m close-up.** R1 faceting risk is the main open check. Texture sizes not measured in round 2 (PBR set).
-   - Thumbnail (side view, round 2): https://media.sketchfab.com/models/87527079bad44917ab1b98a456b46c7e/thumbnails/ (use the 1920 px image from the API record). Three horns (brow pair plus nose), a frill with a row of edge spikes, and a solid frill with no holes. Limbs under the body, not sprawled. Tail held low. No red flags at thumbnail scale.
+   - Polycount: 12,560 triangles (GLB; API faceCount 12,560), 7,372 unique vertices in the GLB (API vertexCount 6,294; the counts differ by how seams are split, so the GLB figure is the one to use for budgets). **Low-ish for a 1 m close-up.** R1 faceting risk is the main open check.
+   - Textures (round 2, read from the GLB's embedded images): 3 × 1024 × 1024 PNG (PBR set, one material).
+   - Thumbnail (¾ front view, round 2): https://media.sketchfab.com/models/87527079bad44917ab1b98a456b46c7e/thumbnails/a8b659c1bc2b43838a37a3d197b85ed2/42c3c41568104a25aada07addfba363a.jpeg (1920×1080). Three horns (brow pair plus nose), a frill with a row of edge spikes, and a solid frill with no holes. Limbs under the body, not sprawled. Tail held low. No red flags at thumbnail scale.
 2. `379f857737564e7eb32f3575d1d1ab26` "Triceratops" (uploader `ericksalinasr07`, author `Gigan_FK`): **demoted to Rejected in round 2 (cannot clear upstream).** See Rejected.
 
 Rejected (Triceratops):
