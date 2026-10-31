@@ -165,3 +165,10 @@ Khi người dùng mở lại và chạy lệnh tiếp tục (ghi trong `runbook
 - Chi tiết nội dung rubric (dựa trên tiêu chí trong 2 bản thiết kế).
 - Cơ chế khóa orchestrator, định dạng chính xác của comment checkpoint.
 - Cách lưu ảnh/video bằng chứng của visual-judge (miễn người dùng xem lại được từ issue/PR).
+
+## 16. Nhãn PR theo tỉ lệ code do AI viết (người dùng yêu cầu 2026-10-31)
+
+- Commit có dòng `Co-Authored-By:` chứa "Claude" = AI viết; còn lại = người viết. Tỉ lệ AI = dòng thay đổi (thêm + xóa) của commit AI ÷ tổng dòng thay đổi của PR.
+- **> 70%** → `agent-author`; **> 50% và ≤ 70%** → `agent-assistant`; **≤ 50%** → `agent-unused` (mốc đúng 70% / 50% là *quyết định của tôi*, người dùng đồng ý).
+- GitHub Action tính lại mỗi lần mở PR / push; luôn chỉ một trong ba nhãn.
+- Hạn chế đã biết: đo theo commit, không theo từng dòng (`git blame`); sửa tay trong commit AI vẫn tính là AI.

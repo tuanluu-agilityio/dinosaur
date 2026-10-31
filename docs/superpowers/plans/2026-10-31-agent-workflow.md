@@ -226,3 +226,37 @@ files: [docs/runbook.md, docs/known-issues.md, .claude/settings.json]
 - [ ] **Step 5:** Commit `docs(agent): add runbook and dry-run fixes`; post "Phase 0 complete" in `Run status`.
 
 **Acceptance:** dry run passed including the resume; zero permission prompts on the second dry run.
+
+---
+
+### P0-T07 — Auto-label PRs by AI-authored share
+```task
+id: P0-T07
+wave: 0
+agent: orchestrator
+model: sonnet
+area: agent
+depends: [P0-T06]
+heavy: false
+files: [scripts/agent/lib/ai-share.mjs, scripts/agent/pr-label.mjs, tests/agent/ai-share.test.mjs, .github/workflows/pr-ai-label.yml, scripts/agent/lib/github.mjs]
+```
+
+User rule (2026-10-31): label each PR by the share of changed lines written by AI. A commit counts as AI-written when its message contains a `Co-Authored-By:` trailer naming Claude (case-insensitive); all other commits count as human. Changed lines = additions + deletions per commit. Exactly one of the three labels is on a PR at any time; recomputed on every push.
+
+**Interfaces — Produces:**
+- `isAiCommit(message: string): boolean`
+- `aiShare(commits: {message: string, additions: number, deletions: number}[]): number` — 0..1; 0 when total changed lines is 0
+- `labelFor(share: number): 'agent-author' | 'agent-assistant' | 'agent-unused'` — `> 0.70` → author; `> 0.50 && <= 0.70` → assistant; `<= 0.50` → unused
+- `scripts/agent/pr-label.mjs <pr-number>` — fetches PR commits + per-commit stats via `gh api`, removes the other two labels, adds the right one, prints `{ok, share, label}`
+
+- [ ] **Step 1: Failing tests** `tests/agent/ai-share.test.mjs`:
+  - `isAiCommit('feat(ui): x\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>')` → true; `co-authored-by: claude` lower-case → true; `Co-Authored-By: Alice <a@x>` → false; "Claude" only in the subject → false
+  - `aiShare([{AI, 80 add, 0 del}, {human, 20, 0}])` → 0.8; empty list → 0; all commits 0 lines → 0
+  - `labelFor(0.71)` → author; `labelFor(0.70)` → assistant; `labelFor(0.51)` → assistant; `labelFor(0.50)` → unused; `labelFor(0)` → unused
+- [ ] **Step 2:** Run → FAIL (module missing). Implement `ai-share.mjs`. Run → PASS.
+- [ ] **Step 3:** `pr-label.mjs`: commits from `gh api repos/{repo}/pulls/{n}/commits --paginate`, stats from `gh api repos/{repo}/commits/{sha}` (`stats.additions/deletions`), merge commits (2+ parents) skipped; `gh pr edit {n} --remove-label … --add-label …`.
+- [ ] **Step 4:** `.github/workflows/pr-ai-label.yml`: `on: pull_request: [opened, synchronize, reopened]`, `permissions: { pull-requests: write, contents: read }`, Node LTS, `node scripts/agent/pr-label.mjs ${{ github.event.pull_request.number }}` with `GH_TOKEN: ${{ github.token }}`.
+- [ ] **Step 5:** Add labels to `LABELS` in `github.mjs`: `agent-author` (AI > 70%), `agent-assistant` (AI 50–70%), `agent-unused` (AI ≤ 50%); run `node scripts/agent/board.mjs setup` (idempotent) to create them.
+- [ ] **Step 6:** Verify on a real PR: open a throwaway PR with one AI commit → label `agent-author`; push a larger human commit → label switches to `agent-unused`; close the PR. Commit `feat(agent): auto-label PRs by AI-authored share`.
+
+**Acceptance:** tests pass; on the throwaway PR the label changed on push and only one of the three labels was present at any time.

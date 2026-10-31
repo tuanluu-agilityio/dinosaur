@@ -93,7 +93,7 @@ wave: 1
 agent: frontend-dev
 model: sonnet
 area: build
-depends: [P0-T06]
+depends: [P0-T07]
 heavy: false
 files: [package.json, tsconfig.json, vite.config.ts, index.html, src/main.ts, src/core/renderer.ts, src/core/quality.ts, src/core/budgets.ts, tests/unit/quality.test.ts, playwright.config.ts, tests/e2e/smoke.spec.ts, .github/workflows/deploy.yml, dev/renderer.html]
 ```
@@ -115,7 +115,7 @@ wave: 1
 agent: frontend-dev
 model: sonnet
 area: i18n
-depends: [P0-T06]
+depends: [P0-T07]
 heavy: false
 files: [src/content/schema.ts, src/content/load.ts, src/i18n/i18n.ts, src/i18n/ui.json, content/species/_example.json, tests/unit/schema.test.ts, tests/unit/i18n.test.ts]
 ```
@@ -133,7 +133,7 @@ wave: 1
 agent: asset-scout
 model: haiku
 area: assets
-depends: [P0-T06]
+depends: [P0-T07]
 heavy: false
 files: [docs/assets/candidates.md, assets/manifest.json]
 ```
@@ -153,7 +153,7 @@ wave: 1
 agent: asset-engineer
 model: sonnet
 area: assets
-depends: [P0-T06]
+depends: [P0-T07]
 heavy: true
 files: [scripts/assets/optimize.mjs, scripts/assets/blender/convert.py, scripts/assets/blender/turntable.py, scripts/assets/fetch.mjs, src/assets/manifest.ts, tests/unit/manifest.test.ts, tests/assets/optimize.test.mjs, tests/fixtures/box-animated.glb]
 ```
@@ -428,7 +428,7 @@ wave: 3
 agent: asset-scout
 model: haiku
 area: audio
-depends: [P0-T06]
+depends: [P0-T07]
 heavy: false
 files: [public/audio/ambient/**, docs/assets/audio.md]
 ```
