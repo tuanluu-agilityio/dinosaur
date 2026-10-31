@@ -1,0 +1,32 @@
+[
+  {
+    "species": "tyrannosaurus",
+    "sourceUrl": "https://sketchfab.com/3d-models/tyrant-king-tyrannosaurus-6465a297fa784598adc49f6e0042d449",
+    "author": "Marcel Schanz (mschanz)",
+    "license": "CC-BY-4.0",
+    "modifications": [],
+    "files": { "high": "assets/src/tyrannosaurus/high.glb", "low": "assets/src/tyrannosaurus/low.glb" },
+    "clips": {},
+    "status": "candidate"
+  },
+  {
+    "species": "triceratops",
+    "sourceUrl": "https://sketchfab.com/3d-models/triceratops-dinosaur-87527079bad44917ab1b98a456b46c7e",
+    "author": "wojciechmiedziocha",
+    "license": "CC-BY-4.0",
+    "modifications": [],
+    "files": { "high": "assets/src/triceratops/high.glb", "low": "assets/src/triceratops/low.glb" },
+    "clips": {},
+    "status": "candidate"
+  },
+  {
+    "species": "pachycephalosaurus",
+    "sourceUrl": "https://sketchfab.com/3d-models/pachycephalosaurus-animation-740349873ae244ef8a19155b525d9193",
+    "author": "seirogan",
+    "license": "CC-BY-4.0",
+    "modifications": [],
+    "files": { "high": "assets/src/pachycephalosaurus/high.glb", "low": "assets/src/pachycephalosaurus/low.glb" },
+    "clips": {},
+    "status": "candidate"
+  }
+]
