@@ -4,13 +4,8 @@
 // Repo: $GITHUB_REPOSITORY (in Actions) or the current gh repo.
 
 import { ghJson, ghText } from './lib/gh.mjs';
-import { aiShare, labelFor, LABELS } from './lib/ai-share.mjs';
-
-const LABEL_INFO = {
-  'agent-author': { color: '6f42c1', description: 'AI wrote > 70% of changed lines' },
-  'agent-assistant': { color: 'a371f7', description: 'AI wrote > 50% and <= 70% of changed lines' },
-  'agent-unused': { color: 'd8b9ff', description: 'AI wrote <= 50% of changed lines' },
-};
+import { aiShare, labelFor, AI_LABELS } from './lib/ai-share.mjs';
+import { LABELS } from './lib/github.mjs';
 
 async function main() {
   const pr = process.argv[2];
@@ -29,12 +24,12 @@ async function main() {
   const share = aiShare(commits);
   const label = labelFor(share);
 
-  for (const name of LABELS) {
-    const { color, description } = LABEL_INFO[name];
+  // setup creates these labels; recreate here too so a fresh fork/repo works (needs issues: write).
+  for (const { name, color, description } of LABELS.filter((l) => AI_LABELS.includes(l.name))) {
     await ghText(['label', 'create', name, '--repo', repo, '--color', color, '--description', description, '--force']);
   }
   const current = await ghJson(['pr', 'view', pr, '--repo', repo, '--json', 'labels', '--jq', '[.labels[].name]']);
-  const stale = current.filter((l) => LABELS.includes(l) && l !== label);
+  const stale = current.filter((l) => AI_LABELS.includes(l) && l !== label);
   const args = ['pr', 'edit', pr, '--repo', repo, '--add-label', label];
   for (const l of stale) args.push('--remove-label', l);
   if (stale.length || !current.includes(label)) await ghText(args);

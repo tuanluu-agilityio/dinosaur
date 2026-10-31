@@ -1,7 +1,7 @@
 // Share of a PR's changed lines written by AI (spec §16). A commit is AI-written
 // when a Co-Authored-By trailer names Claude; the measure is per commit, not per line.
 
-export const LABELS = ['agent-author', 'agent-assistant', 'agent-unused'];
+export const AI_LABELS = ['agent-author', 'agent-assistant', 'agent-unused'];
 
 export function isAiCommit(message) {
   return /^co-authored-by:\s*claude\b/im.test(message);
