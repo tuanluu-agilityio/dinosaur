@@ -50,7 +50,10 @@ async function ensureRepo(repoName) {
   }
   const m = /github\.com[/:]([^/]+)\/(.+?)(?:\.git)?$/.exec(origin);
   if (!m) throw new Error(`origin is not a GitHub repo: ${origin}`);
-  if (git('push', '-u', 'origin', 'main') === null) throw new Error('git push -u origin main failed');
+  // First publish only: once main is protected, all changes arrive through PRs.
+  if (!git('ls-remote', '--heads', 'origin', 'main') && git('push', '-u', 'origin', 'main') === null) {
+    throw new Error('git push -u origin main failed');
+  }
   return { owner: m[1], repo: m[2] };
 }
 
@@ -109,6 +112,20 @@ async function ensureLabels(fullRepo) {
   }
 }
 
+// Every change reaches main through a PR. No approvals required: all agents
+// share the owner's account and GitHub forbids approving your own PR.
+async function ensureBranchProtection(fullRepo) {
+  const body = JSON.stringify({
+    required_status_checks: null,
+    enforce_admins: true,
+    required_pull_request_reviews: { required_approving_review_count: 0 },
+    restrictions: null,
+    allow_force_pushes: false,
+    allow_deletions: false,
+  });
+  await ghText(['api', '-X', 'PUT', `repos/${fullRepo}/branches/main/protection`, '--input', '-'], body);
+}
+
 async function ensureRunStatusIssue(fullRepo) {
   const found = await ghJson(['issue', 'list', '--repo', fullRepo, '--state', 'all', '--label', 'run-status', '--json', 'number']);
   if (found.length) return found[0].number;
@@ -126,6 +143,7 @@ export async function setup(repoName = 't-rex') {
   await ghText(['project', 'link', String(project.number), '--owner', owner, '--repo', fullRepo]).catch(() => {});
   const fields = await ensureFields(owner, project.number);
   await ensureLabels(fullRepo);
+  await ensureBranchProtection(fullRepo);
   const runStatusIssue = await ensureRunStatusIssue(fullRepo);
   const p = { owner, repo, fullRepo, projectNumber: project.number, projectId: project.id, runStatusIssue, ...fields };
   saveProject(p);

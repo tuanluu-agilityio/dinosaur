@@ -14,7 +14,7 @@
 
 ## Global Constraints
 
-- Phase 0 runs **sequentially, one agent, committing directly to `main`** (spec §13). Tasks P0-T01..T03 are executed interactively with the user present (they create the repo and the board); P0-T04..T06 may run unattended.
+- Phase 0 runs **sequentially, one agent**. **Every task — Phase 0 included — goes branch `task/<issue>-<slug>` → PR → squash merge; never commit directly to `main`** (user rule 2026-10-31, spec §13). `main` is protected (PR required, 0 approvals because all agents share one account, no force push, no deletion, admins included). P0-T01..T03 were executed interactively before this rule (direct commits, recorded on their issues); P0-T04 onward may run unattended.
 - Repo is **public**: never commit secrets. `.env` is gitignored; pre-commit hook blocks token-like strings.
 - Branch for every task from Phase 1 on: `task/<issue-number>-<slug>`; squash merge.
 - Commit format: Conventional Commits `<type>(<scope>): <subject>`; types `feat fix perf refactor test docs build ci chore content asset`; scopes = `area:*` labels (`scene dino ui i18n audio assets perf content build agent docs`); subject ≤ 72 chars, imperative, English; footer `Refs #<n>` (Phase 1+) and `Co-Authored-By:` trailer of the model.
