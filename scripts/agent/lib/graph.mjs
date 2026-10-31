@@ -22,7 +22,7 @@ const isCompleted = (t) => t?.status === 'Done' && t.closedAs === 'completed';
 
 export function readyTasks(tasks, maxConcurrent = 3) {
   const byId = new Map(tasks.map((t) => [t.id, t]));
-  const running = tasks.filter((t) => RUNNING.has(t.status));
+  const running = tasks.filter((t) => RUNNING.has(t.status) && !(t.labels ?? []).includes('needs-human'));
   const picked = [];
   let slots = maxConcurrent - running.length;
   let heavyBusy = running.some((t) => t.heavy);

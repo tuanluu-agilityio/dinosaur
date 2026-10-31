@@ -22,6 +22,9 @@ export function checkCommitMsg(msg) {
     return { ok: false, error: `Header is ${header.length} chars (max ${MAX_SUBJECT}).\n${HINT}` };
   }
 
+  if (/[^\x20-\x7E]/.test(header)) {
+    return { ok: false, error: `Header must be plain English ASCII (no diacritics).\n${HINT}` };
+  }
   const m = /^([a-z]+)\(([a-z0-9-]+)\)!?: \S.*$/.exec(header);
   if (!m) return { ok: false, error: HINT };
   if (!TYPES.includes(m[1])) return { ok: false, error: `Unknown type "${m[1]}".\n${HINT}` };
