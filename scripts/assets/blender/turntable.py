@@ -12,6 +12,10 @@ Options:
   --forward AXIS     model forward axis in Blender space: -Y (glTF default), +Y, +X, -X
   --only LIST        comma list of: angles, closeup, far, clips (default: angles,clips)
   --far-dist M       distance for the "far" shot (default 15)
+  --far-lens MM      lens for the far shot (default: computed so the whole animal fits with ~25 % margin at --far-dist)
+  --head X,Y,Z       world-space head point for the close-up (default: 85 % height / 45 % length guess; override for
+                     low-headed quadrupeds). The camera sits exactly 1 m from this point.
+  --strip            also write <prefix>-clip-<name>-strip.png (ffmpeg fps=4, tile=5x4) next to each MP4
   --engine NAME      BLENDER_EEVEE_NEXT (default), BLENDER_EEVEE or CYCLES
 
 Outputs in <outDir>:
@@ -19,7 +23,7 @@ Outputs in <outDir>:
   <prefix>-closeup-1m.png     (head close-up at 1 m, use on the high variant)
   <prefix>-far-15m.png        (use on the low variant)
   <prefix>-clip-<name>.mp4    (side view, ground plane visible, looped to --seconds)
-Frame strips (`ffmpeg ... tile=5x4`) are made by the caller; see CLAUDE.md -> Evidence.
+Render the *.preview.glb from `optimize.mjs --preview` (Blender cannot import meshopt/KTX2).
 """
 import math
 import os
@@ -36,6 +40,7 @@ def parse_args():
     opts = {
         "prefix": None, "res": 1024, "video-res": 720, "seconds": 5.0, "fps": 24,
         "forward": "-Y", "only": "angles,clips", "far-dist": 15.0, "engine": "BLENDER_EEVEE_NEXT",
+        "far-lens": None, "head": None, "strip": False,
     }
     pos = []
     i = 0
@@ -45,6 +50,10 @@ def parse_args():
             key = a[2:]
             if key not in opts:
                 sys.exit("unknown option " + a)
+            if key == "strip":
+                opts[key] = True
+                i += 1
+                continue
             opts[key] = type(opts[key])(argv[i + 1]) if opts[key] is not None else argv[i + 1]
             i += 2
         else:
@@ -78,7 +87,7 @@ def setup_scene(opts):
     return scene
 
 
-def add_lights(center, size):
+def add_lights():
     sun = bpy.data.lights.new("key", "SUN")
     sun.energy = 3.0
     sun.angle = math.radians(8)
@@ -172,10 +181,13 @@ def render_angles(cam, center, extent, fwd, prefix, outdir):
         render_still(os.path.join(outdir, f"{prefix}-{name}.png"))
 
 
-def render_closeup(cam, lo, hi, fwd, prefix, outdir):
+def render_closeup(cam, lo, hi, fwd, prefix, outdir, head_override=None):
     center = (lo + hi) / 2
     length = max(hi.x - lo.x, hi.y - lo.y)
-    head = Vector((center.x, center.y, lo.z + (hi.z - lo.z) * 0.85)) + fwd * (length * 0.45)
+    if head_override:
+        head = Vector(float(v) for v in head_override.split(","))
+    else:
+        head = Vector((center.x, center.y, lo.z + (hi.z - lo.z) * 0.85)) + fwd * (length * 0.45)
     d = rotate_z(fwd, 40)
     loc = head + Vector((d.x, d.y, 0.15)).normalized() * 1.0  # exactly 1 m from the head point
     cam.data.lens = 85
@@ -184,12 +196,20 @@ def render_closeup(cam, lo, hi, fwd, prefix, outdir):
     cam.data.lens = 50
 
 
-def render_far(cam, lo, hi, fwd, prefix, outdir, dist):
+def render_far(cam, lo, hi, fwd, prefix, outdir, dist, lens=None):
     center = (lo + hi) / 2
     side = rotate_z(fwd, 90)
     loc = Vector((center.x, center.y, lo.z + 1.6)) + side * dist
+    lens = float(lens) if lens is not None else None
+    if lens is None:
+        # frame is square: fit the larger of body length / height (+25 % margin) at `dist`, and keep the
+        # aim point at the bbox centre so the whole animal stays inside the frame
+        need = max(hi.x - lo.x, hi.y - lo.y, hi.z - lo.z) * 1.25 + abs(loc.z - center.z) * 2
+        lens = min(50.0, cam.data.sensor_width * dist / need)
+    cam.data.lens = lens
     aim(cam, loc, center)
     render_still(os.path.join(outdir, f"{prefix}-far-{int(dist)}m.png"))
+    cam.data.lens = 50
 
 
 def collect_clips():
@@ -232,7 +252,7 @@ def play_clip(actions):
     return int(start), int(max(end, start + 1))
 
 
-def render_clips(cam, center, extent, fwd, prefix, outdir, opts):
+def render_clips(cam, center, extent, fwd, prefix, outdir, opts, src_fps):
     scene = bpy.context.scene
     clips = collect_clips()
     if not clips:
@@ -256,7 +276,8 @@ def render_clips(cam, center, extent, fwd, prefix, outdir, opts):
         os.makedirs(tmp, exist_ok=True)
         scene.render.image_settings.file_format = "PNG"
         for i in range(total):
-            scene.frame_set(start + (i % length))  # loops the clip to fill --seconds
+            # map output time to source frames so --fps != scene fps does not change clip speed
+            scene.frame_set(start + int(i * src_fps / opts["fps"]) % length)
             scene.render.filepath = os.path.join(tmp, f"f{i:04d}.png")
             bpy.ops.render.render(write_still=True)
         out = os.path.join(outdir, f"{prefix}-clip-{name}.mp4")
@@ -264,6 +285,10 @@ def render_clips(cam, center, extent, fwd, prefix, outdir, opts):
         subprocess.run([ffmpeg, "-y", "-loglevel", "error", "-framerate", str(opts["fps"]), "-i", os.path.join(tmp, "f%04d.png"),
                         "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "18", out], check=True)
         shutil.rmtree(tmp, ignore_errors=True)
+        if opts["strip"]:
+            strip = out[:-4] + "-strip.png"
+            subprocess.run([ffmpeg, "-y", "-loglevel", "error", "-i", out, "-vf", "fps=4,scale=480:-1,tile=5x4",
+                            "-frames:v", "1", strip], check=True)
         print("clip", name, "->", out, f"({length} source frames)")
     scene.frame_set(1)
     scene.render.resolution_x = scene.render.resolution_y = opts["res"]
@@ -277,6 +302,7 @@ def main():
     prefix = opts["prefix"] or os.path.splitext(os.path.basename(model))[0]
     scene = setup_scene(opts)
     bpy.ops.import_scene.gltf(filepath=os.path.abspath(model))
+    src_fps = scene.render.fps / (scene.render.fps_base or 1.0)  # the importer keeps the file's authoring rate
     scene.frame_set(1)
     bpy.context.view_layer.update()
     lo, hi = world_bounds()
@@ -284,16 +310,16 @@ def main():
     extent = (hi - lo).length
     fwd = FORWARD[opts["forward"]]
     add_ground(lo, hi)
-    add_lights(center, extent)
+    add_lights()
     cam = make_camera(opts["res"])
     if "angles" in only:
         render_angles(cam, center, extent, fwd, prefix, outdir)
     if "closeup" in only:
-        render_closeup(cam, lo, hi, fwd, prefix, outdir)
+        render_closeup(cam, lo, hi, fwd, prefix, outdir, opts["head"])
     if "far" in only:
-        render_far(cam, lo, hi, fwd, prefix, outdir, opts["far-dist"])
+        render_far(cam, lo, hi, fwd, prefix, outdir, opts["far-dist"], opts["far-lens"])
     if "clips" in only:
-        render_clips(cam, center, extent, fwd, prefix, outdir, opts)
+        render_clips(cam, center, extent, fwd, prefix, outdir, opts, src_fps)
     print("evidence ->", outdir)
 
 
