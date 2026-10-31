@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Panel dev page</title>
+    <style>html, body { margin: 0; height: 100%; background: #223127; overflow: hidden; }</style>
+  </head>
+  <body>
+    <div id="ui"></div>
+    <script type="module">
+      import { InfoPanel } from '/src/ui/panel.ts';
+      import { Controls } from '/src/ui/controls.ts';
+      import { validateSpecies } from '/src/content/schema.ts';
+      import { getLang } from '/src/i18n/i18n.ts';
+
+      const root = document.getElementById('ui');
+      const controls = new Controls(root);
+      const panel = new InfoPanel(root);
+      window.__backCount = 0;
+      panel.onBack(() => { window.__backCount++; });
+      controls.onMute((m) => { window.__muted = m; });
+      const res = await fetch('/dinosaur/content/species/_example.json');
+      panel.show(validateSpecies(await res.json()), getLang());
+      document.documentElement.dataset.ready = '1';
+    </script>
+  </body>
+</html>
