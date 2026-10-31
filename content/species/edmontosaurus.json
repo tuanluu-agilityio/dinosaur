@@ -1,0 +1,105 @@
+{
+  "id": "edmontosaurus",
+  "scientificName": "Edmontosaurus annectens",
+  "commonName": {
+    "vi": "Khủng long mỏ vịt Edmontosaurus",
+    "en": "Edmontosaurus"
+  },
+  "quickFacts": {
+    "lengthM": [11, 12],
+    "massT": [5.6, 6.1],
+    "periodMa": [66, 67.5],
+    "diet": "herbivore"
+  },
+  "sections": {
+    "behavior": {
+      "en": "Edmontosaurus annectens lived in western North America in the late Maastrichtian, the final stage of the Late Cretaceous, shortly before the Cretaceous-Paleogene boundary, which is dated at 66.043 million years ago. It was a hadrosaur (duck-billed dinosaur) and a herbivore. In a census of Hell Creek skeletons, Tyrannosaurus was as abundant as Edmontosaurus in the upper part of the formation, so this plant-eater was one of the common large animals of the scene. Whether it lived in herds is a hypothesis rather than a fact. The Ruth Mason Dinosaur Quarry in South Dakota is a bonebed (a deposit packed with fossil bones) dominated by this species, interpreted as a catastrophic death assemblage that likely belongs to a single population. Juveniles aged one and two are absent or scarce in such bonebeds, which supports the hypothesis that young and adult hadrosaurs were partly segregated.",
+      "vi": "Edmontosaurus annectens sống ở miền tây Bắc Mỹ vào cuối tầng Maastricht, giai đoạn chót của cuối kỷ Phấn Trắng, ngay trước ranh giới Phấn Trắng - Paleogen, được xác định ở mốc 66,043 triệu năm trước. Nó là một loài khủng long mỏ vịt và là động vật ăn cỏ. Trong một cuộc kiểm kê các bộ xương ở hệ tầng Hell Creek, Tyrannosaurus phong phú ngang Edmontosaurus ở phần trên của hệ tầng, nên loài ăn thực vật này là một trong những con vật lớn thường gặp của khung cảnh ấy. Việc nó có sống thành bầy hay không mới chỉ là giả thuyết, chưa phải sự thật. Mỏ Ruth Mason Dinosaur Quarry ở Nam Dakota là một bãi xương hóa thạch (bonebed), nơi xương chất dày đặc, do loài này chiếm ưu thế; theo giải thích của các nhà nghiên cứu, đây là nơi nhiều con chết cùng lúc vì một thảm họa, có lẽ thuộc về một quần thể duy nhất. Con non một và hai tuổi vắng mặt hoặc hiếm trong các bãi xương như vậy, điều này ủng hộ giả thuyết rằng con non và con trưởng thành phần nào sống tách biệt nhau."
+    },
+    "anatomy": {
+      "en": "The name Edmontosaurus means Edmonton lizard. A 2022 growth study of the Ruth Mason bonebed concluded that fully grown Edmontosaurus annectens measured about 11 to 12 metres in body length, with an average adult body mass near 5.6 tonnes and about 6.1 tonnes for the largest bones measured. The same study found that it grew along a path similar to the smaller hadrosaur Maiasaura but reached a much larger size by about nine years of age. The type specimen, estimated at about 3.4 tonnes, was not yet fully grown. The Natural History Museum in London describes a horny beak and about 1,000 grinding cheek teeth, and notes that conifer needles, twigs and seeds have been found in Edmontosaurus stomachs. Mummified specimens preserve some skin, so its texture is known but not its colour. A Hell Creek mummy, identified as cf. Edmontosaurus, kept mineral replacements of skin and tendon, plus traces of organic compounds from the skin.",
+      "vi": "Tên Edmontosaurus có nghĩa là \"thằn lằn Edmonton\". Một nghiên cứu năm 2022 về sự tăng trưởng, dựa trên bãi xương hóa thạch Ruth Mason, kết luận rằng Edmontosaurus annectens trưởng thành hoàn toàn dài khoảng 11 đến 12 mét, nặng trung bình khoảng 5,6 tấn, và khoảng 6,1 tấn với những xương lớn nhất được đo. Nghiên cứu này cũng thấy nó lớn lên theo một lộ trình giống Maiasaura, một loài khủng long mỏ vịt nhỏ hơn, nhưng đạt kích thước lớn hơn nhiều khi khoảng chín tuổi. Mẫu vật chuẩn của loài, ước tính nặng khoảng 3,4 tấn, vẫn chưa trưởng thành hẳn. Bảo tàng Lịch sử Tự nhiên London mô tả một chiếc mỏ sừng và khoảng 1.000 răng má dùng để nghiền, đồng thời ghi nhận kim thông, cành nhỏ và hạt đã được tìm thấy trong dạ dày của Edmontosaurus. Các mẫu vật \"xác ướp\" giữ lại một phần da, nên ta biết kết cấu của da nhưng không biết màu. Một xác ướp ở Hell Creek, được ghi là cf. Edmontosaurus, còn giữ phần da và gân đã được khoáng chất thay thế, cùng dấu vết hợp chất hữu cơ từ da."
+    },
+    "huntingOrDefense": {
+      "en": "Edmontosaurus shared its world with tyrannosaurs, and two fossils show what that meant. In a 2013 study, a Tyrannosaurus tooth crown was found embedded in two traumatically fused tail vertebrae of a hadrosaur from the Hell Creek Formation of South Dakota, surrounded by healed bone growth. The authors read this as proof that the prey escaped and lived for some time, and as direct evidence that T. rex hunted live animals. A 2026 study describes an adult Edmontosaurus skull from Montana, specimen MOR 1627, with the tip of a tyrannosaurid tooth lodged in the nasal bone. There is no reactive bone around it, so the animal probably died around the time of the bite. The authors suggest the bite came as the predator tried to control the struggling animal or deliver a killing blow, followed by feeding.",
+      "vi": "Edmontosaurus cùng chung thế giới với các loài khủng long bạo chúa, và hai hóa thạch cho thấy điều đó nghĩa là gì. Trong một nghiên cứu năm 2013, người ta tìm thấy thân một chiếc răng Tyrannosaurus cắm trong hai đốt sống đuôi dính liền do chấn thương của một con khủng long mỏ vịt ở hệ tầng Hell Creek, Nam Dakota, xung quanh có xương mọc liền lại. Các tác giả đọc đây là bằng chứng rằng con mồi đã thoát và sống thêm một thời gian, cũng như là bằng chứng trực tiếp rằng T. rex săn mồi sống. Một nghiên cứu năm 2026 mô tả hộp sọ Edmontosaurus trưởng thành từ Montana, mẫu vật MOR 1627, với đầu mút một chiếc răng của khủng long họ bạo chúa (tyrannosaurid) mắc trong xương mũi. Quanh đó không có xương phản ứng, nên con vật có lẽ chết vào khoảng lúc bị cắn. Các tác giả cho rằng cú cắn xảy ra khi kẻ săn mồi cố giữ chặt con vật đang vùng vẫy hoặc tung đòn kết liễu, rồi sau đó ăn thịt."
+    },
+    "discovery": {
+      "en": "Edmontosaurus annectens was named by Marsh in 1892, from the Lance Formation of Wyoming, and the genus name was created in 1917 by Lambe for the Canadian species Edmontosaurus regalis. A 2011 skull study of nearly all known complete skulls concluded that only two species are valid, E. regalis from the late Campanian and E. annectens from the late Maastrichtian. Other names, including Anatotitan, were reinterpreted as growth stages. Soft tissue has produced two famous finds. In 2009, researchers described a well-preserved hadrosaur, listed as cf. Edmontosaurus (an uncertain identification), from the Hell Creek Formation of North Dakota. In 2014, a mummified E. regalis from the Wapiti Formation of Alberta was reported with a three-dimensional crest, or comb, made entirely of soft tissue. It was the first view of such a fleshy signalling structure in a dinosaur.",
+      "vi": "Edmontosaurus annectens được Marsh đặt tên năm 1892, từ hệ tầng Lance ở Wyoming, còn tên chi do Lambe lập năm 1917 cho loài Edmontosaurus regalis của Canada. Một nghiên cứu hộp sọ năm 2011, dựa trên gần như mọi hộp sọ nguyên vẹn đã biết, kết luận rằng chỉ có hai loài hợp lệ, E. regalis cuối tầng Campan và E. annectens cuối tầng Maastricht. Các tên khác, kể cả Anatotitan, được diễn giải lại là những giai đoạn tăng trưởng. Phần mô mềm đã đem lại hai phát hiện nổi tiếng. Năm 2009, các nhà nghiên cứu mô tả một con khủng long mỏ vịt được bảo quản rất tốt, ghi là cf. Edmontosaurus (định danh chưa chắc chắn), ở hệ tầng Hell Creek, Bắc Dakota. Năm 2014, một xác ướp E. regalis ở hệ tầng Wapiti, Alberta, được công bố với một mào ba chiều, hay \"mồng\", làm hoàn toàn bằng mô mềm. Đó là lần đầu thấy một cấu trúc báo hiệu bằng thịt như vậy ở khủng long."
+    }
+  },
+  "contested": [
+    {
+      "en": "Fleshy comb: the comb is known from a single mummified E. regalis from Alberta, not from the Hell Creek species E. annectens. Its authors say it was most likely related to social signaling or sexual selection, which is an interpretation. Whether E. annectens carried a similar comb is not known.",
+      "vi": "Mồng bằng thịt: mồng này chỉ được biết từ một xác ướp E. regalis ở Alberta, không phải từ loài E. annectens của Hell Creek. Các tác giả cho rằng nhiều khả năng nó liên quan đến báo hiệu xã hội hoặc chọn lọc giới tính, và đó là một cách diễn giải. Chưa biết E. annectens có mồng tương tự hay không."
+    },
+    {
+      "en": "Body size: estimates differ. The 2022 growth study gives adults of about 11 to 12 metres and 5.6 tonnes on average, while the American Museum of Natural History cites up to about 3.5 tonnes (7,700 pounds) and the Natural History Museum lists 13 metres and 3.4 tonnes for the genus. Results depend on the method and on whether the specimen was fully grown.",
+      "vi": "Kích thước cơ thể: các ước tính khác nhau. Nghiên cứu tăng trưởng năm 2022 cho con trưởng thành dài khoảng 11 đến 12 mét và nặng trung bình 5,6 tấn, trong khi Bảo tàng Lịch sử Tự nhiên Hoa Kỳ (AMNH) nêu tối đa khoảng 3,5 tấn (7.700 pound) và Bảo tàng Lịch sử Tự nhiên London ghi 13 mét và 3,4 tấn cho cả chi. Kết quả phụ thuộc vào phương pháp và việc mẫu vật đã trưởng thành hẳn hay chưa."
+    },
+    {
+      "en": "Herds and age segregation: the absence of young juveniles from bonebeds supports a hypothesis that young and adult hadrosaurs lived partly apart, but a bonebed is one snapshot of a death event, so herd structure remains unproven.",
+      "vi": "Bầy đàn và sự tách biệt theo tuổi: việc con non vắng mặt trong các bãi xương hóa thạch ủng hộ giả thuyết rằng con non và con trưởng thành phần nào sống tách nhau, nhưng một bãi xương chỉ là một lát cắt của một sự kiện chết hàng loạt, nên cấu trúc bầy đàn vẫn chưa được chứng minh."
+    },
+    {
+      "en": "Predator or scavenger: the healed tail injury shows an attack that failed, while MOR 1627 fits a bite at or near death. Tyrannosaurus may also have eaten carrion, and the Hell Creek census suggests it was not a typical predator. A single bite cannot show how often T. rex hunted or scavenged.",
+      "vi": "Kẻ săn mồi hay kẻ ăn xác thối: vết thương liền ở đuôi cho thấy một cuộc tấn công không thành, còn MOR 1627 phù hợp với một cú cắn vào lúc hoặc gần lúc con vật chết. Tyrannosaurus cũng có thể ăn xác thối, và cuộc kiểm kê Hell Creek cho thấy nó không phải kẻ săn mồi điển hình. Một vết cắn đơn lẻ không cho biết T. rex săn mồi hay ăn xác thối thường xuyên đến mức nào."
+    }
+  ],
+  "sources": [
+    {
+      "title": "Osteohistological and taphonomic life-history assessment of Edmontosaurus annectens from the Ruth Mason dinosaur quarry, South Dakota (Journal of Anatomy)",
+      "url": "https://doi.org/10.1111/joa.13679",
+      "year": 2022
+    },
+    {
+      "title": "Cranial Growth and Variation in Edmontosaurs (Dinosauria: Hadrosauridae): Implications for Latest Cretaceous Megaherbivore Diversity in North America (PLoS ONE)",
+      "url": "https://doi.org/10.1371/journal.pone.0025186",
+      "year": 2011
+    },
+    {
+      "title": "A mummified duck-billed dinosaur with a soft-tissue cock's comb (Current Biology)",
+      "url": "https://doi.org/10.1016/j.cub.2013.11.008",
+      "year": 2014
+    },
+    {
+      "title": "Physical evidence of predatory behavior in Tyrannosaurus rex (PNAS)",
+      "url": "https://doi.org/10.1073/pnas.1216534110",
+      "year": 2013
+    },
+    {
+      "title": "Behavioral implications of an embedded tyrannosaurid tooth and associated tooth marks on an articulated skull of Edmontosaurus from the Hell Creek Formation, Montana (PeerJ)",
+      "url": "https://doi.org/10.7717/peerj.20796",
+      "year": 2026
+    },
+    {
+      "title": "Mineralized soft-tissue structure and chemistry in a mummified hadrosaur from the Hell Creek Formation, North Dakota (Proceedings of the Royal Society B)",
+      "url": "https://doi.org/10.1098/rspb.2009.0812",
+      "year": 2009
+    },
+    {
+      "title": "Dinosaur Census Reveals Abundant Tyrannosaurus and Rare Ontogenetic Stages in the Upper Cretaceous Hell Creek Formation (PLoS ONE)",
+      "url": "https://doi.org/10.1371/journal.pone.0016574",
+      "year": 2011
+    },
+    {
+      "title": "The Hell Creek Formation and its contribution to the Cretaceous-Paleogene extinction: A short primer (Cretaceous Research)",
+      "url": "https://doi.org/10.1016/j.cretres.2015.07.007",
+      "year": 2016
+    },
+    {
+      "title": "Edmontosaurus (Natural History Museum, London, Dino Directory)",
+      "url": "https://www.nhm.ac.uk/discover/dino-directory/edmontosaurus.html"
+    },
+    {
+      "title": "What Fossils Reveal About T. rex Hunting Habits (American Museum of Natural History)",
+      "url": "https://www.amnh.org/explore/news-blogs/fossils-t-rex-hunting-habits",
+      "year": 2019
+    },
+    {
+      "title": "Edmontosaurus annectens (Marsh, 1892) (Smithsonian National Museum of Natural History)",
+      "url": "https://www.si.edu/object/nmnhpaleobiology_3448837"
+    }
+  ]
+}
