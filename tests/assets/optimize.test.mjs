@@ -68,6 +68,8 @@ toktxSuite('optimize.mjs (requires toktx)', () => {
     execFileSync('node', ['scripts/assets/optimize.mjs', 'tests/fixtures/box-animated.glb', pdir, 'box-animated', '--preview'], { stdio: 'pipe' });
     const pl = await new NodeIO().read(join(pdir, 'box-animated.low.preview.glb'));
     expect(tris(pl)).toBe(tris(low));
+    const maxTex = Math.max(...pl.getRoot().listTextures().map((t) => Math.max(...t.getSize())));
+    expect(maxTex).toBeLessThanOrEqual(1024);
   }, 60000);
   it('uses meshopt compression', () => {
     expect(high.getRoot().listExtensionsUsed().map((e) => e.extensionName)).toContain('EXT_meshopt_compression');

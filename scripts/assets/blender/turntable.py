@@ -15,7 +15,7 @@ Options:
   --far-lens MM      lens for the far shot (default: computed so the whole animal fits with ~25 % margin at --far-dist)
   --head X,Y,Z       world-space head point for the close-up (default: 85 % height / 45 % length guess; override for
                      low-headed quadrupeds). The camera sits exactly 1 m from this point.
-  --strip            also write <prefix>-clip-<name>-strip.png (ffmpeg fps=4, tile=5x4) next to each MP4
+  --strip            also write <prefix>-clip-<name>-strip.png (ffmpeg fps=20/duration, tile=5x4: 20 tiles always cover the clip) next to each MP4
   --engine NAME      BLENDER_EEVEE_NEXT (default), BLENDER_EEVEE or CYCLES
 
 Outputs in <outDir>:
@@ -287,7 +287,7 @@ def render_clips(cam, center, extent, fwd, prefix, outdir, opts, src_fps):
         shutil.rmtree(tmp, ignore_errors=True)
         if opts["strip"]:
             strip = out[:-4] + "-strip.png"
-            subprocess.run([ffmpeg, "-y", "-loglevel", "error", "-i", out, "-vf", "fps=4,scale=480:-1,tile=5x4",
+            subprocess.run([ffmpeg, "-y", "-loglevel", "error", "-i", out, "-vf", f"fps=20/{total / opts['fps']:.6f},scale=480:-1,tile=5x4",
                             "-frames:v", "1", strip], check=True)
         print("clip", name, "->", out, f"({length} source frames)")
     scene.frame_set(1)
