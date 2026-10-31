@@ -17,7 +17,7 @@
 - No WebGPU → WebGL2 fallback: full functionality, compute effects off.
 - Scene: Hell Creek, late Maastrichtian (~68–66 Ma). Species: `tyrannosaurus`, `triceratops`, `ankylosaurus`, `edmontosaurus`, `pachycephalosaurus`. Flora: ferns, cycads, conifers, early angiosperms — **no grass**.
 - Launch minimum: T-rex + 2 other species passing `docs/rubrics/visual-model.md`. Never relax a rubric.
-- Model licences: CC0, CC-BY-4.0, CC-BY-NC-4.0 only; record author/url/licence on download.
+- Model licences: CC0, CC-BY-3.0/4.0, CC-BY-NC-3.0/4.0 only (ADR 0013); record author/url/licence on download.
 - Aurelia reference pinned at commit `724aba263459d1b11a49b72bfc7ce8baac840ca8`; read only the files your task lists; keep MIT notice if code is borrowed.
 - Info panel: right side (~1/3 width) when viewport is landscape and ≥ 768 px wide; bottom sheet otherwise.
 - Language default from `navigator.languages` (`vi*` → vi, else en); persisted in `localStorage['dino.lang']`. Mute persisted in `localStorage['dino.muted']`.
@@ -68,7 +68,7 @@ export function getLang(): Lang; export function setLang(l: Lang): void; export 
 export function t(key: UiKey): string; // UI strings in src/i18n/ui.json
 
 // src/assets/manifest.ts (P1-T03 data, P1-T04 code)
-export interface AssetEntry { species: SpeciesId; sourceUrl: string; author: string; license: 'CC0' | 'CC-BY-4.0' | 'CC-BY-NC-4.0'; modifications: string[]; files: { high: string; low: string }; clips: Partial<Record<'idle' | 'walk' | 'eat' | 'roar' | 'run', string>>; status: 'candidate' | 'approved' | 'rejected' }
+export interface AssetEntry { species: SpeciesId; sourceUrl: string; author: string; license: 'CC0' | 'CC-BY-3.0' | 'CC-BY-4.0' | 'CC-BY-NC-3.0' | 'CC-BY-NC-4.0'; modifications: string[]; files: { high: string; low: string }; clips: Partial<Record<'idle' | 'walk' | 'eat' | 'roar' | 'run', string>>; status: 'candidate' | 'approved' | 'rejected' }
 export function validateManifest(json: unknown): AssetEntry[];
 
 // src/camera/director.ts (P2-T08)
@@ -137,7 +137,7 @@ depends: [P0-T07]
 heavy: false
 files: [docs/assets/candidates.md, assets/manifest.json]
 ```
-Read: ADR 0003, 0004; `docs/rubrics/visual-model.md`.
+Read: ADR 0003, 0004, 0013; `docs/rubrics/visual-model.md`.
 
 - [ ] **Step 1:** For each species, search Sketchfab (API `GET /v3/search?type=models&downloadable=true&q=<name>` with `SKETCHFAB_API_TOKEN`), filter licences to CC0 / CC-BY / CC-BY-NC. Also check the leads in the spec's research (Sketchfab "Prehistoric Planet T-rex", "animated T-rex biting loop").
 - [ ] **Step 2:** For each species list ≤ 4 candidates in `docs/assets/candidates.md`: url, author, licence, rigged (y/n), animation clip names, face/vertex count, texture sizes, thumbnail url, obvious rubric red flags. Rank; mark top pick.
@@ -198,7 +198,7 @@ heavy: false
 files: [content/species/tyrannosaurus.json]
 ```
 Read: `docs/rubrics/content.md`, ADR 0002.
-- [ ] Write vi + en per `SpeciesContent`; each section 120–200 words; ≥ 4 sources (museum, peer-reviewed, review papers); contested items at minimum: integument (feathers vs scales), lips, top speed, scavenger-vs-predator. Validate with `validateSpecies` (`npx vitest run schema`). Commit `content(content): add tyrannosaurus content`.
+- [ ] Write vi + en per `SpeciesContent`; each `en` section 120–200 words (`vi` 160–300 syllables); ≥ 4 sources (museum, peer-reviewed, review papers); contested items at minimum: integument (feathers vs scales), lips, top speed, scavenger-vs-predator. Validate with `validateSpecies` (`npx vitest run schema`). Commit `content(content): add tyrannosaurus content`.
 
 ### P2-T03 — Content: Triceratops
 ```task

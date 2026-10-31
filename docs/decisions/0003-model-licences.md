@@ -1,6 +1,6 @@
 # 0003 — 3D model and media licences
 
-- **Status:** Accepted
+- **Status:** Superseded by 0013 (adds the 3.0 versions; everything else stands)
 - **Date:** 2026-10-31
 - **Decided by:** user (non-commercial, free) + planner (ND exclusion)
 

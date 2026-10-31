@@ -1,10 +1,13 @@
 # Rubric — dinosaur model (visual-judge)
 
-Grade every line PASS / FAIL with the evidence named. Any FAIL → `CHANGES:`. Do not pass "almost".
+Grade every line PASS / FAIL with the evidence named. Any FAIL → `CHANGES:`. Do not pass "almost". Animation lines (A1–A4) are judged from the frame strips.
 
 ## Evidence required (attached/linked in the PR)
 - 6 turntable PNGs (front, back, left, right, ¾ front-high, ¾ rear-low) at 1024 px, neutral grey HDRI — for **both** `high` and `low` variants.
-- One MP4 per animation clip (≥ 5 s, side view, ground plane visible).
+- One 1 m close-up PNG of head and skin (high variant) — for R1/R2.
+- One PNG of the low variant at ≥ 15 m in a neutral scene — for R3.
+- One MP4 per animation clip (≥ 5 s, side view, ground plane visible) **plus its frame strip PNG** (reviewers cannot watch video; see CLAUDE.md → Evidence).
+- All evidence published to the `review-artifacts` pre-release; URLs in the PR body.
 - `gltf-transform inspect` output for both variants.
 - Licence quote copied from the source page.
 
@@ -36,7 +39,7 @@ Grade every line PASS / FAIL with the evidence named. Any FAIL → `CHANGES:`. D
 ## Technical
 | # | Check | Evidence |
 |---|---|---|
-| T1 | Licence is CC0 / CC-BY-4.0 / CC-BY-NC-4.0, recorded in `assets/manifest.json` with author + URL | manifest + quote |
+| T1 | Licence is CC0 / CC-BY-3.0 / CC-BY-4.0 / CC-BY-NC-3.0 / CC-BY-NC-4.0 (ADR 0013), recorded in `assets/manifest.json` with author + URL | manifest + quote |
 | T2 | `high` GLB ≤ 15 MB, `low` GLB ≤ 3 MB (Edmontosaurus low ≤ 2 MB) | inspect output |
 | T3 | Textures KTX2; high ≤ 2048 px, low ≤ 1024 px | inspect output |
 | T4 | Animation clip names match the manifest `clips` map | inspect output |
