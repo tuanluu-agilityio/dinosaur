@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Performance spike</title>
+    <style>
+      html, body { margin: 0; height: 100%; background: #0b0f0c; overflow: hidden; }
+      canvas { display: block; width: 100%; height: 100%; }
+      #dev-overlay { position: fixed; top: 8px; left: 8px; padding: 4px 8px; font: 12px monospace; color: #cfe; background: rgba(0,0,0,.6); }
+    </style>
+  </head>
+  <body>
+    <canvas id="scene"></canvas>
+    <div id="dev-overlay" hidden></div>
+    <script type="module" src="/src/spike/spike.ts"></script>
+  </body>
+</html>
