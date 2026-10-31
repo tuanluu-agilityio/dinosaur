@@ -1,0 +1,27 @@
+{
+  "owner": "tuanluu-agilityio",
+  "repo": "dinosaur",
+  "fullRepo": "tuanluu-agilityio/dinosaur",
+  "projectNumber": 5,
+  "projectId": "PVT_kwHOAXZ-Ps4BpmDw",
+  "runStatusIssue": 1,
+  "fieldIds": {
+    "status": "PVTSSF_lAHOAXZ-Ps4BpmDwzhoA-RA",
+    "agent": "PVTF_lAHOAXZ-Ps4BpmDwzhoA-U0",
+    "model": "PVTSSF_lAHOAXZ-Ps4BpmDwzhoA-VQ",
+    "wave": "PVTF_lAHOAXZ-Ps4BpmDwzhoA-W4",
+    "attempt": "PVTF_lAHOAXZ-Ps4BpmDwzhoA-Xk",
+    "heartbeat": "PVTF_lAHOAXZ-Ps4BpmDwzhoA-YE"
+  },
+  "statusOptionIds": {
+    "Todo": "83221fb0",
+    "In Progress": "7e4a1db0",
+    "Review": "6c688689",
+    "Done": "cfb36105"
+  },
+  "modelOptionIds": {
+    "haiku": "92f82153",
+    "sonnet": "e2a45280",
+    "opus": "614c50f6"
+  }
+}

@@ -99,7 +99,7 @@ files: [package.json, tsconfig.json, vite.config.ts, index.html, src/main.ts, sr
 ```
 Read: ADR 0001, 0006; Aurelia `src/app.js`, `vite.config.js`.
 
-- [ ] **Step 1:** Add deps: `three` (latest stable, exact version), `typescript`, `vite`, `@playwright/test`, `vite-plugin-tsl-operator`; `vite.config.ts` multi-page (`index.html` + `dev/*.html`), `base: '/t-rex/'`.
+- [ ] **Step 1:** Add deps: `three` (latest stable, exact version), `typescript`, `vite`, `@playwright/test`, `vite-plugin-tsl-operator`; `vite.config.ts` multi-page (`index.html` + `dev/*.html`), `base: '/dinosaur/'`.
 - [ ] **Step 2: Failing tests** `tests/unit/quality.test.ts`: `detectTier({webgpu:false,…})` → `'low'`; webgpu+mobile → `'medium'`; webgpu+desktop+concurrency ≥ 8 → `'high'`; `FpsGovernor({downgradeBelow:28, windowSec:3})` fed 3 s of 40 ms frames from `high` → returns `'medium'` once, then `null` until another full window; never below `'low'`; never upgrades.
 - [ ] **Step 3:** Implement `quality.ts`, `budgets.ts` (placeholders: high 6000/800/300 ferns/cycads/conifers, 20000 particles; medium half; low quarter, shadows/godrays/verlet only on high), `renderer.ts` (`WebGPURenderer({antialias:true})`, `await renderer.init()`, `isWebGPU = renderer.backend.isWebGPUBackend`), `startLoop` via `renderer.setAnimationLoop`.
 - [ ] **Step 4:** `dev/renderer.html` + `src/main.ts` render a lit cube and show tier + backend in a dev-only overlay. Smoke e2e: page loads, canvas non-empty (pixel read), zero console errors.

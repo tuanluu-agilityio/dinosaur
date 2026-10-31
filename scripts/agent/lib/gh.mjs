@@ -17,8 +17,8 @@ export async function ghJson(args) {
   return out.trim() ? JSON.parse(out) : null;
 }
 
-export async function ghText(args) {
-  return (await run(args)).trim();
+export async function ghText(args, input) {
+  return (await run(args, input)).trim();
 }
 
 export async function ghGraphql(query, variables = {}) {

@@ -16,6 +16,9 @@ const COMMANDS = {
   resume: 'List In Progress/Review tasks with their last checkpoint and worktree state',
   pause: 'pause --reason <text>  Note a pause on running issues and Run status',
   status: 'Summary counts per status',
+  lock: 'Take the single-orchestrator lock (fails if another live session holds it)',
+  heartbeat: 'Refresh the orchestrator lock',
+  unlock: 'Release the orchestrator lock',
 };
 
 function usage() {
