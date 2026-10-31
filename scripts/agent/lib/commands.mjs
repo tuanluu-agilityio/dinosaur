@@ -206,6 +206,16 @@ export function makeCommands({ gh, sh, root, loadTasks, exists, now }) {
       const p = gh.loadProject();
       const tasks = await boardState(p);
       const active = tasks.filter((t) => ['In Progress', 'Review'].includes(t.status) && t.number && !needsHuman(t));
+      // Ad-hoc issues (follow-ups, fixes) are on the board but in no plan file.
+      const planNumbers = new Set(tasks.map((t) => t.number));
+      const issueByNumber = new Map((await gh.listIssues(p)).map((i) => [i.number, i]));
+      for (const item of await gh.listItems(p)) {
+        const issue = issueByNumber.get(item.content.number);
+        if (!issue || planNumbers.has(issue.number) || issue.state !== 'OPEN') continue;
+        if (!['In Progress', 'Review'].includes(item.status)) continue;
+        if (issue.labels.some((l) => l.name === 'needs-human')) continue;
+        active.push({ id: null, number: issue.number, status: item.status, assignedAgent: item.agent, assignedModel: item.model, attempt: item.attempt ?? 0 });
+      }
       const out = [];
       for (const t of active) {
         const checkpoint = ownerCheckpoint(p, await gh.issueComments(p, t.number));

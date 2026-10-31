@@ -206,6 +206,18 @@ describe('resume', () => {
     expect(r.active[0].checkpoint.next).toBe('step 2');
   });
 
+  it('also reports In Progress board items that are not plan tasks (ad-hoc issues)', async () => {
+    const adHoc = { number: 9, title: 'fix something', body: 'no marker', state: 'OPEN', labels: [], url: 'u/9' };
+    const { commands } = fakeWorld({
+      tasks: [t], issues: [openIssue(t, 5), adHoc], items: [boardItem(5), boardItem(9, { status: 'In Progress', agent: 'frontend-dev', model: 'sonnet', attempt: 1 })],
+      comments: { 9: [{ author: OWNER, body: cp({ branch: 'task/9-fix' }) }] },
+    });
+    const r = await commands.resume();
+    expect(r.active.map((a) => a.number)).toEqual([9]);
+    expect(r.active[0]).toMatchObject({ id: null, agent: 'frontend-dev', model: 'sonnet' });
+    expect(r.active[0].checkpoint.next).toBe('step 2');
+  });
+
   it('skips tasks marked needs-human', async () => {
     const issue = { ...openIssue(t, 5), labels: [{ name: 'needs-human' }] };
     const { commands } = fakeWorld({ tasks: [t], issues: [issue], items: [boardItem(5, { status: 'In Progress' })] });
