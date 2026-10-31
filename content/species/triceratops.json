@@ -1,0 +1,97 @@
+{
+  "id": "triceratops",
+  "scientificName": "Triceratops horridus",
+  "commonName": {
+    "vi": "Khủng long ba sừng",
+    "en": "Triceratops"
+  },
+  "quickFacts": {
+    "lengthM": [6, 9],
+    "massT": [6, 12],
+    "periodMa": [66, 68],
+    "diet": "herbivore"
+  },
+  "sections": {
+    "behavior": {
+      "en": "Triceratops lived in western North America at the very end of the Cretaceous, in the Maastrichtian, shortly before the Cretaceous-Paleogene boundary, which is dated at 66.043 million years ago. It was a ceratopsian (horned dinosaur) and a herbivore. In a census of the Hell Creek Formation, Triceratops made up about 40 per cent of the dinosaur skeletons recorded. Whether it lived in herds is contested. A 2009 study described the first Triceratops bonebed, in southeastern Montana, holding at least three juveniles, and discussed what it implies for gregarious (group-living) behaviour. Its lead author cautioned that the reason for the grouping is unknown and that it was probably not a full-time habit. The Redpath Museum states that the species lived in herds of hundreds or thousands, but a single small bonebed cannot demonstrate that. Treat group size as an open question: young animals may have gathered at least at times, while the lifestyle of adults remains unclear.",
+      "vi": "Triceratops sống ở miền tây Bắc Mỹ vào cuối kỷ Phấn Trắng, thuộc tầng Maastricht, ngay trước ranh giới Phấn Trắng - Paleogen, được xác định ở mốc 66,043 triệu năm trước. Nó là một loài khủng long sừng và là động vật ăn cỏ. Trong một cuộc kiểm kê hệ tầng Hell Creek, Triceratops chiếm khoảng 40 phần trăm số bộ xương khủng long được ghi nhận. Việc nó có sống thành bầy hay không vẫn còn tranh luận. Một nghiên cứu năm 2009 mô tả ổ xương Triceratops đầu tiên, ở đông nam bang Montana, chứa ít nhất ba cá thể non, và bàn về ý nghĩa của nó đối với tập tính sống bầy đàn. Tác giả chính thận trọng rằng chưa ai biết lý do chúng tụ lại và đó có lẽ không phải thói quen thường xuyên. Bảo tàng Redpath nêu rằng loài này sống thành bầy hàng trăm hay hàng nghìn con, nhưng một ổ xương nhỏ không thể chứng minh điều đó. Hãy xem quy mô bầy đàn là câu hỏi còn bỏ ngỏ: các cá thể non có thể đã tụ tập, ít nhất đôi lúc, còn lối sống của con trưởng thành vẫn chưa rõ."
+    },
+    "anatomy": {
+      "en": "According to the Redpath Museum, adults reached about 9 metres in length and about 6 to 12 tonnes, while its teenage specimen Sara, aged 10 to 15 years, was about 6 metres long and 3 to 5 tonnes. The name means three-horned face. Sara's skull is about 2 metres long and weighs 275 kilograms. The beak was tipped, and the jaw muscles could cut and eat small trees. The horns and the frill changed shape and direction as the animal grew. The frill of Triceratops is solid, unlike the frill of its relative Torosaurus, which has a pair of large circular openings. Analysis of more than 50 skulls from the Hell Creek Formation indicates that the two recognised species, T. horridus and T. prorsus, are stratigraphically separated, and that the genus likely changed gradually through time. Both horns and frill may have served more than one purpose, as discussed under the contested points below.",
+      "vi": "Theo Bảo tàng Redpath, con trưởng thành dài khoảng 9 mét và nặng khoảng 6 đến 12 tấn, còn mẫu vật tuổi thiếu niên Sara, 10 đến 15 tuổi, dài khoảng 6 mét và nặng 3 đến 5 tấn. Cái tên có nghĩa là khuôn mặt ba sừng. Hộp sọ của Sara dài khoảng 2 mét và nặng 275 kilôgam. Mỏ có đầu nhọn, còn cơ hàm đủ sức cắt và ăn cả cây nhỏ. Sừng và diềm cổ đổi hình dạng và hướng khi con vật lớn lên. Diềm cổ của Triceratops đặc, khác với diềm cổ của họ hàng Torosaurus có một cặp lỗ tròn lớn. Phân tích hơn 50 hộp sọ từ hệ tầng Hell Creek cho thấy hai loài được công nhận, T. horridus và T. prorsus, nằm ở các tầng đá khác nhau, và chi này nhiều khả năng đã biến đổi dần theo thời gian. Cả sừng lẫn diềm cổ có thể đã phục vụ nhiều mục đích, như được bàn ở phần các điểm còn tranh luận bên dưới."
+    },
+    "huntingOrDefense": {
+      "en": "Triceratops fed on plants, and its horns served in defence, but defence was probably not their only job. A study of 87 Centrosaurus frills and 69 Triceratops frills found that Triceratops had a significantly higher rate of healed squamosal lesions in the frill. The authors read this as consistent with Triceratops using its horns in combat and with the frill adapted as a protective structure, possibly for the neck, in addition to display. The Redpath Museum adds that the horns, whose shape changed with growth, may also have helped attract mates. Which animals Triceratops fought is not known, since the study does not identify the cause of any single injury. It shared its world with Tyrannosaurus, whose skeletons were as abundant as those of Edmontosaurus in the upper Hell Creek Formation. How the two interacted is not established by the sources used here.",
+      "vi": "Triceratops ăn thực vật, và sừng của nó dùng để tự vệ, nhưng tự vệ có lẽ không phải công dụng duy nhất. Một nghiên cứu trên 87 diềm cổ Centrosaurus và 69 diềm cổ Triceratops cho thấy Triceratops có tỷ lệ tổn thương đã lành ở xương squamosal của diềm cổ cao hơn đáng kể. Các tác giả cho rằng điều này phù hợp với việc Triceratops dùng sừng để giao đấu, và diềm cổ thích nghi như một cấu trúc bảo vệ, có thể là bảo vệ cổ, bên cạnh vai trò phô diễn. Bảo tàng Redpath bổ sung rằng sừng, vốn đổi hình dạng theo tuổi, cũng có thể giúp thu hút bạn tình. Triceratops từng giao đấu với con vật nào thì chưa rõ, vì nghiên cứu không xác định nguyên nhân của từng vết thương. Nó chung sống với Tyrannosaurus, loài có số bộ xương nhiều ngang Edmontosaurus ở phần trên của hệ tầng Hell Creek. Hai loài tương tác với nhau thế nào thì các nguồn dùng ở đây chưa xác lập được."
+    },
+    "discovery": {
+      "en": "The genus Triceratops was named by Marsh in 1889, and Marsh named the related Torosaurus in 1891. Fossils have been found from Alberta to Colorado and from Saskatchewan to South Dakota. In Montana's Hell Creek Formation, a census recorded dozens of Triceratops skeletons, and later work placed more than 50 skulls in their rock layers. The Redpath Museum's skull of Sara was found by Hans Larsson and his team near Eastend, Saskatchewan, and the skull was recovered in 400 pieces that a technician spent three years cleaning and reassembling. The 2009 Montana bonebed was reported as the first of its kind for the genus. Each find helps to test long-standing ideas about how Triceratops grew and whether it lived in groups.",
+      "vi": "Chi Triceratops được Marsh đặt tên năm 1889, và Marsh đặt tên cho Torosaurus, họ hàng gần của nó, năm 1891. Hóa thạch đã được tìm thấy từ Alberta đến Colorado và từ Saskatchewan đến Nam Dakota. Ở hệ tầng Hell Creek của bang Montana, một cuộc kiểm kê đã ghi nhận hàng chục bộ xương Triceratops, và các nghiên cứu sau đó đặt hơn 50 hộp sọ vào đúng tầng đá của chúng. Hộp sọ Sara của Bảo tàng Redpath do Hans Larsson cùng nhóm của ông tìm thấy gần Eastend, bang Saskatchewan, được thu hồi thành 400 mảnh và một kỹ thuật viên đã mất ba năm để làm sạch và ghép lại. Ổ xương ở Montana năm 2009 được báo cáo là ổ xương đầu tiên thuộc chi này. Mỗi phát hiện mới giúp kiểm chứng những ý tưởng lâu nay về cách Triceratops lớn lên và việc nó có sống thành nhóm hay không, hai câu hỏi mà bằng chứng hiện có mới trả lời được một phần."
+    }
+  },
+  "contested": [
+    {
+      "en": "Torosaurus synonymy: Scannella and Horner (2010) argued that Torosaurus is the old adult form of Triceratops, but Longrich and Field (2012) concluded that Torosaurus is a distinct genus with no known intermediates, and Maiorino and colleagues (2013) also supported Torosaurus as a valid taxon.",
+      "vi": "Torosaurus có phải là Triceratops: Scannella và Horner (2010) cho rằng Torosaurus là dạng trưởng thành già của Triceratops, nhưng Longrich và Field (2012) kết luận Torosaurus là một chi riêng, chưa biết dạng trung gian nào, và Maiorino cùng cộng sự (2013) cũng ủng hộ Torosaurus là một đơn vị phân loại hợp lệ."
+    },
+    {
+      "en": "Frill function: evidence of healed injuries suggests the frill could be protective as well as a display structure, while the Redpath Museum suggests it may also have attracted mates, so the main function is not settled.",
+      "vi": "Chức năng của diềm cổ: các vết thương đã lành cho thấy diềm cổ có thể vừa để bảo vệ vừa để phô diễn, còn Bảo tàng Redpath cho rằng nó cũng có thể thu hút bạn tình, nên chức năng chính vẫn chưa ngã ngũ."
+    },
+    {
+      "en": "Herd behaviour: a bonebed with at least three juveniles hints at group living, but its authors do not know why they were together or for how long, and museum claims of herds of hundreds or thousands go beyond that evidence.",
+      "vi": "Tập tính bầy đàn: một ổ xương có ít nhất ba cá thể non gợi ý đời sống nhóm, nhưng các tác giả không biết vì sao chúng ở cùng nhau hay trong bao lâu, và những tuyên bố của bảo tàng về bầy hàng trăm hay hàng nghìn con vượt quá bằng chứng đó."
+    }
+  ],
+  "sources": [
+    {
+      "title": "Torosaurus Marsh, 1891, is Triceratops Marsh, 1889 (Ceratopsidae: Chasmosaurinae): synonymy through ontogeny (Journal of Vertebrate Paleontology)",
+      "url": "https://doi.org/10.1080/02724634.2010.483632",
+      "year": 2010
+    },
+    {
+      "title": "Torosaurus Is Not Triceratops: Ontogeny in Chasmosaurine Ceratopsids as a Case Study in Dinosaur Taxonomy (PLoS ONE)",
+      "url": "https://doi.org/10.1371/journal.pone.0032623",
+      "year": 2012
+    },
+    {
+      "title": "Is Torosaurus Triceratops? Geometric Morphometric Evidence of Late Maastrichtian Ceratopsid Dinosaurs (PLoS ONE)",
+      "url": "https://doi.org/10.1371/journal.pone.0081608",
+      "year": 2013
+    },
+    {
+      "title": "Evidence of Combat in Triceratops (PLoS ONE)",
+      "url": "https://doi.org/10.1371/journal.pone.0004252",
+      "year": 2009
+    },
+    {
+      "title": "The First Triceratops Bonebed and its Implications for Gregarious Behavior (Journal of Vertebrate Paleontology)",
+      "url": "https://research-information.bris.ac.uk/en/publications/the-first-triceratops-bonebed-and-its-implications-for-gregarious/",
+      "year": 2009
+    },
+    {
+      "title": "Gang of juvenile dinosaurs discovered (Burpee Museum and Northern Illinois University press release, via ScienceDaily)",
+      "url": "https://www.sciencedaily.com/releases/2009/03/090324081431.htm",
+      "year": 2009
+    },
+    {
+      "title": "Evolutionary trends in Triceratops from the Hell Creek Formation, Montana (PNAS)",
+      "url": "https://doi.org/10.1073/pnas.1313334111",
+      "year": 2014
+    },
+    {
+      "title": "Dinosaur Census Reveals Abundant Tyrannosaurus and Rare Ontogenetic Stages in the Upper Cretaceous Hell Creek Formation (PLoS ONE)",
+      "url": "https://doi.org/10.1371/journal.pone.0016574",
+      "year": 2011
+    },
+    {
+      "title": "The Hell Creek Formation and its contribution to the Cretaceous-Paleogene extinction: A short primer (Cretaceous Research)",
+      "url": "https://doi.org/10.1016/j.cretres.2015.07.007",
+      "year": 2016
+    },
+    {
+      "title": "Triceratops, Sara the Triceratops (Redpath Museum, McGill University)",
+      "url": "https://www.mcgill.ca/redpath/education/resources/dinosaurs/triceratops"
+    }
+  ]
+}
