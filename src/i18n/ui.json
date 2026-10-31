@@ -1,0 +1,18 @@
+{
+  "back": { "vi": "Quay lại", "en": "Back" },
+  "mute": { "vi": "Tắt tiếng", "en": "Mute" },
+  "unmute": { "vi": "Bật tiếng", "en": "Unmute" },
+  "skipIntro": { "vi": "Bỏ qua giới thiệu", "en": "Skip intro" },
+  "clickHint": { "vi": "Nhấp vào một con khủng long để khám phá", "en": "Click a dinosaur to explore" },
+  "sections.behavior": { "vi": "Hành vi", "en": "Behavior" },
+  "sections.anatomy": { "vi": "Giải phẫu", "en": "Anatomy" },
+  "sections.huntingOrDefense": { "vi": "Săn mồi và phòng thủ", "en": "Hunting and defense" },
+  "sections.discovery": { "vi": "Phát hiện", "en": "Discovery" },
+  "quickFacts.length": { "vi": "Chiều dài", "en": "Length" },
+  "quickFacts.mass": { "vi": "Khối lượng", "en": "Mass" },
+  "quickFacts.period": { "vi": "Thời kỳ", "en": "Period" },
+  "quickFacts.diet": { "vi": "Chế độ ăn", "en": "Diet" },
+  "credits": { "vi": "Ghi công", "en": "Credits" },
+  "loadError": { "vi": "Không thể tải nội dung.", "en": "Could not load content." },
+  "retry": { "vi": "Thử lại", "en": "Retry" }
+}

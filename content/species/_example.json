@@ -1,0 +1,18 @@
+{
+  "id": "tyrannosaurus",
+  "scientificName": "Tyrannosaurus rex",
+  "commonName": { "vi": "Khủng long bạo chúa", "en": "Tyrant lizard king" },
+  "quickFacts": { "lengthM": [11, 12.3], "massT": [6, 8.8], "periodMa": [66, 68], "diet": "carnivore" },
+  "sections": {
+    "behavior": { "vi": "Placeholder hành vi.", "en": "Placeholder behavior." },
+    "anatomy": { "vi": "Placeholder giải phẫu.", "en": "Placeholder anatomy." },
+    "huntingOrDefense": { "vi": "Placeholder săn mồi.", "en": "Placeholder hunting." },
+    "discovery": { "vi": "Placeholder phát hiện.", "en": "Placeholder discovery." }
+  },
+  "contested": [
+    { "vi": "Placeholder tranh luận.", "en": "Placeholder contested item." }
+  ],
+  "sources": [
+    { "title": "Example source", "url": "https://example.org", "year": 2020 }
+  ]
+}
