@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Camera director dev page</title>
+    <style>
+      html, body { margin: 0; height: 100%; background: #0b0f0c; overflow: hidden; }
+      canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+      #hud { position: fixed; top: 8px; left: 8px; padding: 4px 8px; font: 12px monospace; color: #cfe; background: rgba(0,0,0,.6); }
+      #hud button { margin-left: 6px; }
+    </style>
+  </head>
+  <body>
+    <canvas id="scene"></canvas>
+    <div id="hud"><span id="state">state: -</span>
+      <button id="skip">skip</button><button id="focus">focus</button><button id="back">back</button></div>
+    <script type="module">
+      import {
+        Scene, PerspectiveCamera, Mesh, BoxGeometry, CylinderGeometry, PlaneGeometry, SphereGeometry,
+        MeshStandardMaterial, DirectionalLight, HemisphereLight, Fog, Color, Group,
+      } from 'three/webgpu';
+      import { createRenderer, startLoop } from '/src/core/renderer.ts';
+      import { CameraDirector } from '/src/camera/director.ts';
+
+      const canvas = document.getElementById('scene');
+      const { renderer } = await createRenderer(canvas);
+      const scene = new Scene();
+      scene.background = new Color(0x9fb8a0);
+      scene.fog = new Fog(0x9fb8a0, 20, 90);
+      scene.add(new HemisphereLight(0xdfffe0, 0x3a3020, 1.2));
+      const sun = new DirectionalLight(0xfff2cc, 3);
+      sun.position.set(30, 50, 20);
+      scene.add(sun);
+
+      const ground = new Mesh(new PlaneGeometry(300, 300), new MeshStandardMaterial({ color: 0x4a5a35 }));
+      ground.rotation.x = -Math.PI / 2;
+      scene.add(ground);
+
+      // Stand-in forest (real flora arrives in later tasks): trunks + canopy blobs, kept off the intro path.
+      const trunkMat = new MeshStandardMaterial({ color: 0x5b4632 });
+      const leafMat = new MeshStandardMaterial({ color: 0x2f6b3a });
+      let seed = 7;
+      const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+      for (let i = 0; i < 160; i++) {
+        const x = (rnd() - 0.5) * 120, z = (rnd() - 0.5) * 120;
+        // keep a corridor around the camera path (from (-34,30) to (12,14) and up the valley)
+        const dPath = Math.abs((x + 34) * 0.57 + (z - 30) * 0.82) ;
+        if (dPath < 5 && z > 0) continue;
+        if (Math.abs(x - 6) < 8 && z < 5) continue;
+        const h = 10 + rnd() * 8;
+        const g = new Group();
+        const t = new Mesh(new CylinderGeometry(0.35, 0.5, h, 6), trunkMat);
+        t.position.y = h / 2;
+        const c = new Mesh(new SphereGeometry(3 + rnd() * 2, 8, 6), leafMat);
+        c.position.y = h + 1;
+        g.add(t, c);
+        g.position.set(x, 0, z);
+        scene.add(g);
+      }
+      const dino = new Mesh(new BoxGeometry(6, 3, 2.5), new MeshStandardMaterial({ color: 0xa0522d }));
+      dino.position.set(4, 1.5, -18);
+      scene.add(dino);
+
+      const camera = new PerspectiveCamera(50, 1, 0.1, 400);
+      camera.position.set(12, 14.5, 14);
+      camera.lookAt(0, 1.5, -22);
+      const director = new CameraDirector(camera, canvas);
+
+      const resize = () => {
+        renderer.setSize(window.innerWidth, window.innerHeight, false);
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+      };
+      window.addEventListener('resize', resize);
+      resize();
+
+      const stateEl = document.getElementById('state');
+      document.getElementById('skip').onclick = () => director.skipIntro();
+      document.getElementById('focus').onclick = () => director.focus(dino, 5);
+      document.getElementById('back').onclick = () => director.returnToForest();
+
+      const step = (dt) => {
+        director.update(dt);
+        stateEl.textContent = `state: ${director.state}`;
+        renderer.render(scene, camera);
+      };
+      // ?manual: no free-running loop; evidence scripts advance the clock deterministically via __dev.step(dt).
+      window.__dev = { director, camera, dino, controls: director.controls, step };
+      if (!new URLSearchParams(location.search).has('manual')) startLoop(step);
+      document.documentElement.dataset.ready = '1';
+      if (!new URLSearchParams(location.search).has('noIntro')) director.playIntro();
+    </script>
+  </body>
+</html>
