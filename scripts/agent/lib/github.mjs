@@ -21,6 +21,9 @@ export const LABELS = [
   { name: 'blocked', color: 'b60205', description: 'A dependency was dropped or needs a human' },
   { name: 'heavy', color: '5319e7', description: 'Blender/Playwright perf: never runs alongside another heavy task' },
   { name: 'run-status', color: 'c5def5', description: 'Run status log' },
+  { name: 'agent-author', color: '6f42c1', description: 'AI wrote > 70% of changed lines' },
+  { name: 'agent-assistant', color: 'a371f7', description: 'AI wrote > 50% and <= 70% of changed lines' },
+  { name: 'agent-unused', color: 'd8b9ff', description: 'AI wrote <= 50% of changed lines' },
 ];
 
 export function loadProject(root = '.') {
