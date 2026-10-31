@@ -1,0 +1,111 @@
+{
+  "id": "pachycephalosaurus",
+  "scientificName": "Pachycephalosaurus wyomingensis",
+  "commonName": {
+    "vi": "Khủng long đầu dày Pachycephalosaurus",
+    "en": "Pachycephalosaurus"
+  },
+  "quickFacts": {
+    "lengthM": [3, 3],
+    "massT": [0.37, 0.45],
+    "periodMa": [66, 67.5],
+    "diet": "herbivore"
+  },
+  "sections": {
+    "behavior": {
+      "vi": "Pachycephalosaurus sống ở miền tây Bắc Mỹ vào cuối tầng Maastricht, giai đoạn sau cùng của cuối kỷ Phấn Trắng, trước cuộc đại tuyệt chủng khoảng 66 triệu năm trước. Hóa thạch của nó được tìm thấy ở hệ tầng Hell Creek (các bang Montana và Nam Dakota) và hệ tầng Lance (các bang Wyoming và Nam Dakota). Khủng long đầu dày thường được mô tả là loài đi bằng hai chân và ăn thực vật. Một cuộc kiểm kê năm 2011 ở Hell Creek cho thấy răng rụng của cá thể trưởng thành Pachycephalosaurus phổ biến ở các điểm hóa thạch nhỏ (những điểm tập trung nhiều mảnh hóa thạch nhỏ), nhưng không ghi nhận bộ xương nào ở phần trên của hệ tầng. Nghiên cứu năm 2016 đề xuất rằng sừng và các núm xương của cá thể non có thể giúp đồng loại nhận ra tuổi và địa vị xã hội đang thay đổi, nhưng đây mới chỉ là giả thuyết. Nghiên cứu năm 2022 về một loài khủng long đầu dày khác ở Hell Creek gợi ý rằng các loài này chiếm những ổ sinh thái khác nhau tùy theo kích thước cơ thể. Những nghiên cứu trên không cho biết Pachycephalosaurus sống đơn độc hay theo đàn.",
+      "en": "Pachycephalosaurus lived in western North America in the latest Maastrichtian, the final stretch of the Late Cretaceous before the mass extinction about 66 million years ago. Its fossils come from the Hell Creek Formation of Montana and South Dakota and from the Lance Formation of Wyoming and South Dakota. Pachycephalosaurs (bone-headed dinosaurs) are usually described as bipedal plant eaters. A 2011 census of Hell Creek found that adult shed teeth of Pachycephalosaurus are common in microsites (small, fossil-rich sites), yet no skeletons were recorded in the upper part of the formation. A 2016 study proposes that the horns and nodes of young animals may have let others recognise an individual's age and changing social status, but this is a hypothesis. A 2022 study of another Hell Creek pachycephalosaurid suggests that these dinosaurs occupied different ecological niches according to body size. Nothing in these studies shows whether Pachycephalosaurus lived alone or in groups."
+    },
+    "anatomy": {
+      "vi": "Pachycephalosaurus chủ yếu được biết qua hộp sọ, nên kích thước cơ thể chỉ là ước tính. Theo các số liệu tham khảo, chiều dài khoảng 3 mét và khối lượng khoảng 370 đến 450 kilôgam; một nghiên cứu năm 2014 về khối lượng cơ thể cho con số 370 kilôgam. Đặc điểm nổi bật nhất là mái vòm xương trán và xương đỉnh, tức phần nóc hộp sọ dày lên. Mái vòm của cá thể trưởng thành dài khoảng 260 đến 360 milimét, và một mái vòm ở Montana dài 310 milimét, cao 132 milimét. Hộp sọ cấu tạo chủ yếu từ xương dị sản, loại xương hình thành khi mô sợi chuyển thẳng thành xương. Một loài khủng long đầu dày họ hàng ở Hell Creek có các ống mạch gợi ý lớp sừng keratin phủ trên mái vòm; ở Pachycephalosaurus, các sợi xương gợi ý có một dạng lớp phủ nào đó, nhưng bản chất của nó chưa được chứng minh. Các hàng núm và sừng trên xương vảy (xương ở góc sau hộp sọ) thay đổi rất nhiều khi lớn lên. Ở cá thể non, nóc sọ phẳng với một hàng núm dọc đường giữa, còn mái vòm chỉ phồng lên về sau.",
+      "en": "Pachycephalosaurus is known mostly from skulls, so its body size is an estimate. Reference figures give a length of about 3 metres and a mass of roughly 370 to 450 kilograms; a 2014 body-mass study gives 370 kilograms. Its signature feature is the frontoparietal dome, the thickened roof of the skull formed by the frontal and parietal bones. Adult domes measure about 260 to 360 millimetres long, and one Montana dome is 310 millimetres long and 132 millimetres high. The skull is built largely of metaplastic bone, which forms when fibrous tissue turns directly into bone. A related Hell Creek pachycephalosaurid shows canals that suggest a keratin covering on the dome; in Pachycephalosaurus, fibres suggest some kind of covering, but its nature is unproven. Rows of nodes and horns on the squamosal (the bone at the back corner of the skull) change greatly with growth. In young animals the skull roof is flat, with a row of nodes along the midline, and the dome swells later."
+    },
+    "huntingOrDefense": {
+      "vi": "Pachycephalosaurus ăn thực vật, nên câu hỏi là mái vòm trên đầu dùng để làm gì. Ý tưởng kinh điển là húc đầu giống cừu sừng lớn (bighorn), và điều này vẫn còn tranh cãi. Một nghiên cứu mô học năm 2004 lập luận rằng mô xương của hộp sọ và những thay đổi của nó khi lớn lên không phù hợp với việc húc đầu. Một nghiên cứu mô phỏng năm 2011 trên Stegoceras, một loài khủng long đầu dày họ hàng, cho thấy cấu trúc và cách chịu lực giống các loài thú móng guốc thường húc nhau khi tranh đấu. Một khảo sát năm 2013 trên 109 mái vòm thuộc hơn 14 loài ghi nhận tổn thương ở 22 phần trăm (thuộc ít nhất chín loài), tập trung gần đỉnh mái vòm và không có ở các dạng đầu phẳng; các tác giả cho rằng đó là dấu hiệu tranh giành bạn tình hoặc lãnh thổ. Tuy vậy, họ nói rõ đây chưa phải bằng chứng chắc chắn và không loại trừ vai trò phô trương. Một mái vòm Pachycephalosaurus ở Montana có những vết lõm mà các tác giả cho là do chấn thương rồi nhiễm trùng. Vì vậy, mái vòm có thể là vũ khí, tín hiệu, hoặc cả hai, nhưng chưa được chứng minh.",
+      "en": "Pachycephalosaurus was a plant eater, so the question is what its dome was for. The classic idea is head-butting, as in bighorn sheep, and it remains contested. A 2004 histology study argued that the skull tissue and its changes during growth are inconsistent with head-butting. A 2011 modelling study of a related pachycephalosaur, Stegoceras, found a structure and stress response similar to fighting hoofed mammals. A 2013 survey of 109 domes from more than 14 species found damage in 22 per cent (at least nine species), clustered near the top of the dome, and none on flat-headed forms; the authors read this as fighting for mates or territory. Even so, they state that it is not unequivocal evidence, and a display role cannot be ruled out. One Pachycephalosaurus dome from Montana carries pits that the authors attribute to injury followed by infection. So the dome may have been a weapon, a signal, or both, but this is unproven."
+    },
+    "discovery": {
+      "vi": "Charles Gilmore mô tả mẫu vật đầu tiên năm 1931 với tên Troodon wyomingensis, dựa trên một phần hộp sọ (USNM 12031) ở hệ tầng Lance, bang Wyoming. Barnum Brown và Erich Schlaikjer lập chi Pachycephalosaurus năm 1943. Hai dạng ở Hell Creek sau đó được đặt tên như các chi riêng: Stygimoloch năm 1983 và Dracorex năm 2006. Năm 2009, Jack Horner và Mark Goodwin dùng mô học xương và chụp cắt lớp CT để đề xuất rằng Dracorex là cá thể non còn Stygimoloch là cá thể gần trưởng thành của Pachycephalosaurus, tức ba cái tên có thể chỉ là các giai đoạn tăng trưởng của một loài. Các mẫu vật non nhỏ được công bố năm 2016 ủng hộ giả thuyết này, dù không phải ai cũng chấp nhận. Một nghiên cứu năm 2022 mô tả Platytholus, một hộp sọ ở Hell Creek không khớp với chuỗi tăng trưởng nào đã biết và có thể là một loài riêng. Nhiều mẫu vật chỉ là các mái vòm rời, nên bức tranh đầy đủ về loài này vẫn đang được hoàn thiện.",
+      "en": "Charles Gilmore described the first specimen in 1931 as Troodon wyomingensis, based on a partial skull (USNM 12031) from the Lance Formation of Wyoming. Barnum Brown and Erich Schlaikjer erected the genus Pachycephalosaurus in 1943. Two Hell Creek forms were named later as separate genera: Stygimoloch in 1983 and Dracorex in 2006. In 2009 Jack Horner and Mark Goodwin used bone histology and CT scans to propose that Dracorex is a juvenile and Stygimoloch a subadult of Pachycephalosaurus, so the three would be growth stages of one animal. Small juvenile specimens described in 2016 supported this, though not everyone accepts it. A 2022 study described a skull from Hell Creek, Platytholus, that fits no known growth series and may be a separate species. Many specimens are isolated domes, so the full picture of this animal is still being built."
+    }
+  },
+  "contested": [
+    {
+      "vi": "Húc đầu: một nghiên cứu mô học năm 2004 phản bác, trong khi nghiên cứu cơ học trên một loài họ hàng (2011) và khảo sát tổn thương mái vòm năm 2013 ủng hộ việc đánh nhau giữa đồng loại; các tác giả năm 2013 nói bằng chứng chưa chắc chắn và không loại trừ vai trò phô trương.",
+      "en": "Head-butting: a 2004 histology study argued against it, while biomechanical work on a relative (2011) and a 2013 survey of dome injuries support intraspecific fighting; the 2013 authors say the evidence is not unequivocal and that display cannot be ruled out."
+    },
+    {
+      "vi": "Stygimoloch và Dracorex là các giai đoạn tăng trưởng: được đề xuất năm 2009 và được mẫu vật non năm 2016 ủng hộ, nhưng chính các tác giả ban đầu lưu ý phần trang trí không khớp hoàn toàn với cá thể trưởng thành, và một nghiên cứu năm 2022 coi một hộp sọ Hell Creek khác nằm ngoài mọi chuỗi tăng trưởng.",
+      "en": "Stygimoloch and Dracorex as growth stages: proposed in 2009 and supported by juvenile material in 2016, but the original authors note that the ornamentation does not match the adult exactly, and a 2022 study treats another Hell Creek skull as outside any growth series."
+    },
+    {
+      "vi": "Kích thước cơ thể: chỉ có hộp sọ được mô tả, nên chiều dài và khối lượng là ước tính (khoảng 3 mét, 370 đến 450 kilôgam); một nghiên cứu năm 2014 ước tính khối lượng từ số đo xương chi.",
+      "en": "Body size: with mostly skull material described, length and mass are estimates (about 3 metres, 370 to 450 kilograms); one 2014 study estimated mass from measured limb bones."
+    },
+    {
+      "vi": "Lớp phủ mái vòm: các ống mạch ở một loài khủng long đầu dày họ hàng gợi ý lớp vỏ keratin, và các sợi xương ở Pachycephalosaurus gợi ý có lớp phủ nào đó, nhưng bản chất của nó chưa được chứng minh.",
+      "en": "Dome covering: canals in a related pachycephalosaurid suggest a keratin sheath, and fibres in Pachycephalosaurus suggest some covering, but its nature is unproven."
+    }
+  ],
+  "sources": [
+    {
+      "title": "A new species of troödont dinosaur from the Lance formation of Wyoming (Proceedings of the United States National Museum 79, no. 2875)",
+      "url": "https://doi.org/10.5479/si.00963801.79-2875.1",
+      "year": 1931
+    },
+    {
+      "title": "Extreme Cranial Ontogeny in the Upper Cretaceous Dinosaur Pachycephalosaurus (PLoS ONE)",
+      "url": "https://doi.org/10.1371/journal.pone.0007626",
+      "year": 2009
+    },
+    {
+      "title": "The early expression of squamosal horns and parietal ornamentation confirmed by new end-stage juvenile Pachycephalosaurus fossils from the Upper Cretaceous Hell Creek Formation, Montana (Journal of Vertebrate Paleontology)",
+      "url": "https://doi.org/10.1080/02724634.2016.1078343",
+      "year": 2016
+    },
+    {
+      "title": "Distributions of Cranial Pathologies Provide Evidence for Head-Butting in Dome-Headed Dinosaurs (Pachycephalosauridae) (PLoS ONE)",
+      "url": "https://doi.org/10.1371/journal.pone.0068620",
+      "year": 2013
+    },
+    {
+      "title": "Cranial Pathologies in a Specimen of Pachycephalosaurus (PLoS ONE)",
+      "url": "https://doi.org/10.1371/journal.pone.0036227",
+      "year": 2012
+    },
+    {
+      "title": "A new pachycephalosaurid from the Hell Creek Formation, Garfield County, Montana, U.S.A. (Journal of Vertebrate Paleontology)",
+      "url": "https://doi.org/10.1080/02724634.2023.2190369",
+      "year": 2022
+    },
+    {
+      "title": "Common Functional Correlates of Head-Strike Behavior in the Pachycephalosaur Stegoceras validum (Ornithischia, Dinosauria) and Combative Artiodactyls (PLoS ONE)",
+      "url": "https://doi.org/10.1371/journal.pone.0021422",
+      "year": 2011
+    },
+    {
+      "title": "Cranial histology of pachycephalosaurs (Ornithischia: Marginocephalia) reveals transitory structures inconsistent with head-butting behavior (Paleobiology)",
+      "url": "https://doi.org/10.1666/0094-8373(2004)030<0253:CHOPOM>2.0.CO;2",
+      "year": 2004
+    },
+    {
+      "title": "Dinosaur Census Reveals Abundant Tyrannosaurus and Rare Ontogenetic Stages in the Upper Cretaceous Hell Creek Formation (PLoS ONE)",
+      "url": "https://doi.org/10.1371/journal.pone.0016574",
+      "year": 2011
+    },
+    {
+      "title": "Rates of dinosaur body mass evolution indicate 170 million years of sustained ecological innovation on the avian stem lineage (PLOS Biology)",
+      "url": "https://doi.org/10.1371/journal.pbio.1001853",
+      "year": 2014
+    },
+    {
+      "title": "The Hell Creek Formation and its contribution to the Cretaceous-Paleogene extinction: A short primer (Cretaceous Research)",
+      "url": "https://doi.org/10.1016/j.cretres.2015.07.007",
+      "year": 2016
+    },
+    {
+      "title": "Pachycephalosaurus (Natural History Museum, London, Dino Directory)",
+      "url": "https://www.nhm.ac.uk/discover/dino-directory/pachycephalosaurus.html"
+    }
+  ]
+}
