@@ -1,0 +1,12 @@
+{
+  "name": "t-rex",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "prepare": "git config core.hooksPath .githooks"
+  },
+  "devDependencies": {
+    "vitest": "^5.0.5"
+  }
+}

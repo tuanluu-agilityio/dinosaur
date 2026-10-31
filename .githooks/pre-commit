@@ -1,0 +1,2 @@
+#!/bin/sh
+git diff --cached --no-color | node scripts/hooks/check-secrets.mjs

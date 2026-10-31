@@ -1,0 +1,2 @@
+#!/bin/sh
+exec node scripts/hooks/check-commit-msg.mjs "$1"
