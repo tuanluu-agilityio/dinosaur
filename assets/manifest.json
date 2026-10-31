@@ -11,8 +11,8 @@
   },
   {
     "species": "triceratops",
-    "sourceUrl": "https://sketchfab.com/3d-models/triceratops-prorsus-67bccb400cfb45699f4fea6db7664b87",
-    "author": "Nobilis 2 (nobilishornet2)",
+    "sourceUrl": "https://sketchfab.com/3d-models/triceratops-dinosaur-87527079bad44917ab1b98a456b46c7e",
+    "author": "wojciechmiedziocha",
     "license": "CC-BY-4.0",
     "modifications": [],
     "files": { "high": "assets/src/triceratops/high.glb", "low": "assets/src/triceratops/low.glb" },
@@ -20,23 +20,13 @@
     "status": "candidate"
   },
   {
-    "species": "edmontosaurus",
-    "sourceUrl": "https://sketchfab.com/3d-models/edmontosaurus-b278ec123e054751a7937f8937949e80",
-    "author": "Modbuff (CGreature)",
-    "license": "CC-BY-4.0",
-    "modifications": [],
-    "files": { "high": "assets/src/edmontosaurus/high.glb", "low": "assets/src/edmontosaurus/low.glb" },
-    "clips": {},
-    "status": "candidate"
-  },
-  {
     "species": "pachycephalosaurus",
-    "sourceUrl": "https://sketchfab.com/3d-models/pachycephalosaurus-1fdb61b75099482eac02bc1b87a3f71e",
-    "author": "Made_Rex",
+    "sourceUrl": "https://sketchfab.com/3d-models/pachycephalosaurus-animation-740349873ae244ef8a19155b525d9193",
+    "author": "seirogan",
     "license": "CC-BY-4.0",
     "modifications": [],
     "files": { "high": "assets/src/pachycephalosaurus/high.glb", "low": "assets/src/pachycephalosaurus/low.glb" },
-    "clips": { "idle": "Pachycephalo_Idle", "walk": "Pachycephalo_Walk", "run": "Pachycephalo_Run" },
+    "clips": {},
     "status": "candidate"
   }
 ]
