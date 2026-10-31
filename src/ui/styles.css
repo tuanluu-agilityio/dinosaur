@@ -1,0 +1,39 @@
+:root { --dino-bg: rgba(14, 20, 16, 0.92); --dino-fg: #e8efe6; --dino-accent: #9fd18b; }
+
+.dino-controls { position: fixed; top: 12px; left: 12px; z-index: 30; display: flex; gap: 8px; }
+.dino-controls button, .dino-panel__back {
+  font: 600 14px/1 system-ui, sans-serif; color: var(--dino-fg); background: var(--dino-bg);
+  border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 8px; padding: 10px 14px; min-height: 40px; cursor: pointer;
+}
+.dino-controls button[hidden] { display: none; }
+
+.dino-panel {
+  position: fixed; z-index: 20; display: flex; flex-direction: column; box-sizing: border-box;
+  color: var(--dino-fg); background: var(--dino-bg); font: 15px/1.5 system-ui, sans-serif;
+  top: 0; right: 0; bottom: 0; width: 33vw; min-width: 280px;
+}
+.dino-panel[hidden] { display: none; }
+.dino-panel__handle { display: none; touch-action: none; padding: 10px 0; cursor: ns-resize; }
+.dino-panel__handle span { display: block; width: 44px; height: 5px; margin: 0 auto; border-radius: 3px; background: rgba(255, 255, 255, 0.4); }
+.dino-panel__back { align-self: flex-start; margin: 12px 16px 0; }
+.dino-panel__body { flex: 1; overflow-y: auto; padding: 8px 20px 24px; overscroll-behavior: contain; }
+.dino-panel__title { margin: 8px 0 0; font-size: 1.6rem; }
+.dino-panel__sci { margin: 0 0 12px; font-style: italic; opacity: 0.8; }
+.dino-panel__facts { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; margin: 0 0 16px; }
+.dino-panel__facts dt { opacity: 0.7; }
+.dino-panel__facts dd { margin: 0; font-weight: 600; }
+.dino-panel__section-title { all: unset; cursor: pointer; display: block; font-weight: 700; color: var(--dino-accent); margin-top: 12px; }
+.dino-panel__section p { margin: 4px 0 0; }
+.dino-panel h3 { color: var(--dino-accent); margin: 20px 0 6px; font-size: 1rem; }
+.dino-panel ul { margin: 0; padding-left: 20px; }
+.dino-panel a { color: var(--dino-accent); }
+
+/* Phone portrait: bottom sheet, default 50 % height, draggable up to 90 %. */
+@media (orientation: portrait) and (max-width: 700px) {
+  .dino-panel {
+    top: auto; left: 0; right: 0; width: auto; min-width: 0;
+    height: var(--sheet-h, 50vh); height: var(--sheet-h, 50dvh); max-height: 90vh; max-height: 90dvh; border-radius: 16px 16px 0 0;
+  }
+  .dino-panel__handle { display: block; }
+  .dino-controls { flex-wrap: wrap; }
+}

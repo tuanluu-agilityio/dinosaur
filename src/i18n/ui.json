@@ -1,4 +1,9 @@
 {
+  "contested": { "vi": "Còn tranh luận", "en": "Contested" },
+  "sources": { "vi": "Nguồn", "en": "Sources" },
+  "diet.carnivore": { "vi": "Ăn thịt", "en": "Carnivore" },
+  "diet.herbivore": { "vi": "Ăn thực vật", "en": "Herbivore" },
+  "diet.omnivore": { "vi": "Ăn tạp", "en": "Omnivore" },
   "back": { "vi": "Quay lại", "en": "Back" },
   "mute": { "vi": "Tắt tiếng", "en": "Mute" },
   "unmute": { "vi": "Bật tiếng", "en": "Unmute" },
