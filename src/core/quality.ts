@@ -29,16 +29,20 @@ const ORDER: QualityTier[] = ['low', 'medium', 'high'];
 
 /** Downgrades one tier when the average frame rate over a full window is too low. Never upgrades. */
 export class FpsGovernor {
-  tier: QualityTier;
+  private _tier: QualityTier;
   private readonly downgradeBelow: number;
   private readonly windowMs: number;
   private elapsed = 0;
   private frames = 0;
 
-  constructor(opts: { downgradeBelow?: number; windowSec?: number } = {}, startTier: QualityTier = 'high') {
+  constructor(opts: { downgradeBelow?: number; windowSec?: number; startTier?: QualityTier } = {}) {
     this.downgradeBelow = opts.downgradeBelow ?? 28;
     this.windowMs = (opts.windowSec ?? 3) * 1000;
-    this.tier = startTier;
+    this._tier = opts.startTier ?? 'high';
+  }
+
+  get tier(): QualityTier {
+    return this._tier;
   }
 
   sample(dtMs: number): QualityTier | null {
@@ -48,10 +52,10 @@ export class FpsGovernor {
     const fps = (this.frames * 1000) / this.elapsed;
     this.elapsed = 0;
     this.frames = 0;
-    const i = ORDER.indexOf(this.tier);
+    const i = ORDER.indexOf(this._tier);
     if (fps < this.downgradeBelow && i > 0) {
-      this.tier = ORDER[i - 1];
-      return this.tier;
+      this._tier = ORDER[i - 1];
+      return this._tier;
     }
     return null;
   }

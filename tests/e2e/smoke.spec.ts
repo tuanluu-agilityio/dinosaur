@@ -9,8 +9,23 @@ test('renderer dev page draws a non-empty canvas with no console errors', async 
   await expect(page.locator('#dev-overlay')).toContainText('tier:');
   await page.waitForTimeout(1000);
   const shot = await page.locator('#scene').screenshot();
-  // screenshot-based pixel read: count distinct non-background bytes
-  const distinct = new Set(shot.subarray(shot.length > 4000 ? 1000 : 0)).size;
-  expect(distinct).toBeGreaterThan(20);
+  const b64 = shot.toString('base64');
+  const ratio = await page.evaluate(async (data) => {
+    const img = new Image();
+    img.src = `data:image/png;base64,${data}`;
+    await img.decode();
+    const c = document.createElement('canvas');
+    c.width = img.width;
+    c.height = img.height;
+    const ctx = c.getContext('2d')!;
+    ctx.drawImage(img, 0, 0);
+    const px = ctx.getImageData(0, 0, c.width, c.height).data;
+    let diff = 0;
+    for (let i = 0; i < px.length; i += 4) {
+      if (Math.abs(px[i] - 11) + Math.abs(px[i + 1] - 15) + Math.abs(px[i + 2] - 12) > 24) diff++;
+    }
+    return diff / (px.length / 4);
+  }, b64);
+  expect(ratio).toBeGreaterThan(0.01);
   expect(errors).toEqual([]);
 });

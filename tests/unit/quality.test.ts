@@ -24,7 +24,7 @@ describe('FpsGovernor', () => {
     return out.filter((x) => x !== null);
   };
   it('downgrades once per full window and never below low', () => {
-    const g = new FpsGovernor({ downgradeBelow: 28, windowSec: 3 }, 'high');
+    const g = new FpsGovernor({ downgradeBelow: 28, windowSec: 3, startTier: 'high' });
     expect(feed(g, 3.1, 40)).toEqual(['medium']);
     expect(g.tier).toBe('medium');
     expect(feed(g, 1, 40)).toEqual([]);
@@ -33,7 +33,7 @@ describe('FpsGovernor', () => {
     expect(g.tier).toBe('low');
   });
   it('never upgrades on good fps', () => {
-    const g = new FpsGovernor({ downgradeBelow: 28, windowSec: 3 }, 'medium');
+    const g = new FpsGovernor({ downgradeBelow: 28, windowSec: 3, startTier: 'medium' });
     expect(feed(g, 10, 8)).toEqual([]);
     expect(g.tier).toBe('medium');
   });

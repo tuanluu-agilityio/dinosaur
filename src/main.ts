@@ -9,7 +9,7 @@ async function main() {
   const { renderer, isWebGPU } = await createRenderer(canvas);
   const caps = { ...readDeviceCaps(), webgpu: isWebGPU };
   let tier = detectTier(caps);
-  const governor = new FpsGovernor({ downgradeBelow: 28, windowSec: 3 }, tier);
+  const governor = new FpsGovernor({ downgradeBelow: 28, windowSec: 3, startTier: tier });
 
   const scene = new Scene();
   const camera = new PerspectiveCamera(50, 1, 0.1, 100);
@@ -23,7 +23,7 @@ async function main() {
 
   const overlay = document.getElementById('dev-overlay');
   const show = () => {
-    if (!overlay || !import.meta.env.DEV && !location.pathname.includes('/dev/')) return;
+    if (!overlay || (!import.meta.env.DEV && !location.pathname.includes('/dev/'))) return;
     overlay.hidden = false;
     overlay.textContent = `tier: ${tier} | backend: ${isWebGPU ? 'webgpu' : 'webgl2'}`;
   };
