@@ -4,9 +4,21 @@
   "type": "module",
   "scripts": {
     "test": "vitest run",
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "e2e": "playwright test",
     "prepare": "git config core.hooksPath .githooks"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.1",
+    "@types/node": "^26.6.6",
+    "@types/three": "^0.187.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.5",
+    "vite-plugin-tsl-operator": "^1.10.0",
     "vitest": "^5.0.5"
+  },
+  "dependencies": {
+    "three": "0.187.0"
   }
 }
