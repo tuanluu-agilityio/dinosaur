@@ -18,7 +18,7 @@ Mở terminal mới sau khi cài để PATH được cập nhật.
 ## 2. Bắt đầu chạy
 
 ```
-cd "D:\2026 - Tuan\t-rex"
+cd <thư mục repo>  # thư mục bạn đã clone repo vào
 claude
 /run
 ```
