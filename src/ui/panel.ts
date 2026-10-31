@@ -5,15 +5,6 @@ import './styles.css';
 type SectionKey = keyof SpeciesContent['sections'];
 const SECTION_KEYS: SectionKey[] = ['behavior', 'anatomy', 'huntingOrDefense', 'discovery'];
 
-// Labels with no key in ui.json yet (that file is owned by P1-T02); move there in a follow-up.
-const EXTRA: Record<string, Record<Lang, string>> = {
-  contested: { vi: 'Còn tranh luận', en: 'Contested' },
-  sources: { vi: 'Nguồn', en: 'Sources' },
-  carnivore: { vi: 'Ăn thịt', en: 'Carnivore' },
-  herbivore: { vi: 'Ăn thực vật', en: 'Herbivore' },
-  omnivore: { vi: 'Ăn tạp', en: 'Omnivore' },
-};
-
 const fmt = (n: number): string => String(Math.round(n * 10) / 10);
 const range = (r: [number, number], unit: string, desc = false): string => {
   const [a, b] = desc ? [Math.max(...r), Math.min(...r)] : [r[0], r[1]];
@@ -84,7 +75,7 @@ export class InfoPanel {
     add(t('quickFacts.length'), range(c.quickFacts.lengthM, 'm'));
     add(t('quickFacts.mass'), range(c.quickFacts.massT, 't'));
     add(t('quickFacts.period'), range(c.quickFacts.periodMa, 'Ma', true));
-    add(t('quickFacts.diet'), EXTRA[c.quickFacts.diet][lang]);
+    add(t('quickFacts.diet'), t(`diet.${c.quickFacts.diet}`));
     body.append(facts);
 
     const list = el('div', 'dino-panel__sections');
@@ -101,7 +92,7 @@ export class InfoPanel {
 
     if (c.contested.length) {
       const sec = el('section', 'dino-panel__contested');
-      sec.append(el('h3', undefined, EXTRA.contested[lang]));
+      sec.append(el('h3', undefined, t('contested')));
       const ul = el('ul');
       for (const item of c.contested) ul.append(el('li', undefined, item[lang]));
       sec.append(ul);
@@ -109,7 +100,7 @@ export class InfoPanel {
     }
 
     const src = el('section', 'dino-panel__sources');
-    src.append(el('h3', undefined, EXTRA.sources[lang]));
+    src.append(el('h3', undefined, t('sources')));
     const ul = el('ul');
     for (const s of c.sources) {
       const a = el('a', undefined, s.year ? `${s.title} (${s.year})` : s.title);

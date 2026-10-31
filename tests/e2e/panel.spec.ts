@@ -1,6 +1,8 @@
 import { test, expect, type Page } from '@playwright/test';
 
 async function open(page: Page, w: number, h: number) {
+  page.on('console', (m) => { if (m.type() === 'error') throw new Error(`console error: ${m.text()}`); });
+  page.on('pageerror', (e) => { throw e; });
   await page.setViewportSize({ width: w, height: h });
   await page.goto('/dinosaur/dev/panel.html');
   await page.evaluate(() => localStorage.clear());

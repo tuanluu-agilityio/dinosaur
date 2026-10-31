@@ -32,7 +32,7 @@
 @media (orientation: portrait) and (max-width: 700px) {
   .dino-panel {
     top: auto; left: 0; right: 0; width: auto; min-width: 0;
-    height: var(--sheet-h, 50vh); max-height: 90vh; border-radius: 16px 16px 0 0;
+    height: var(--sheet-h, 50vh); height: var(--sheet-h, 50dvh); max-height: 90vh; max-height: 90dvh; border-radius: 16px 16px 0 0;
   }
   .dino-panel__handle { display: block; }
   .dino-controls { flex-wrap: wrap; }
