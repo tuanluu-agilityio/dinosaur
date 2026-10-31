@@ -3,11 +3,16 @@ import { Narrator, NarrationMissing } from '../../src/audio/narrator';
 
 class FakeAudio {
   static all: FakeAudio[] = [];
+  static hold = false;
   playing = false;
   playCalls = 0;
   constructor(public src: string) { FakeAudio.all.push(this); }
+  rejectPending: ((e: Error) => void) | null = null;
   async play(): Promise<void> {
     this.playCalls++;
+    if (FakeAudio.hold) {
+      await new Promise<void>((_, rej) => { this.rejectPending = rej; });
+    }
     if (this.src.includes('missing')) throw new Error('404');
     this.playing = true;
   }
@@ -42,5 +47,20 @@ describe('Narrator', () => {
     const n = make();
     await expect(n.play('missing' as never, 'en')).rejects.toBeInstanceOf(NarrationMissing);
     expect(playing()).toBe(0);
+  });
+  it('does not report missing when a superseded play is aborted', async () => {
+    const n = make();
+    FakeAudio.hold = true;
+    const first = n.play('tyrannosaurus', 'en');
+    FakeAudio.hold = false;
+    const second = n.play('triceratops', 'en');
+    FakeAudio.all[0].rejectPending?.(new Error('AbortError'));
+    await expect(first).resolves.toBeUndefined();
+    await expect(second).resolves.toBeUndefined();
+  });
+  it('keeps the original error as cause on NarrationMissing', async () => {
+    const n = make();
+    const err = await n.play('missing' as never, 'en').catch((e) => e);
+    expect((err as Error).cause).toBeInstanceOf(Error);
   });
 });

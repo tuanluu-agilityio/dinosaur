@@ -1,8 +1,8 @@
 import type { Lang, SpeciesContent, SpeciesId } from '../content/schema';
 
 export class NarrationMissing extends Error {
-  constructor(readonly url: string) {
-    super(`narration missing: ${url}`);
+  constructor(readonly url: string, cause?: unknown) {
+    super(`narration missing: ${url}`, { cause });
     this.name = 'NarrationMissing';
   }
 }
@@ -30,9 +30,10 @@ export class Narrator {
     this.current = audio;
     try {
       await audio.play();
-    } catch {
-      if (this.current === audio) this.current = null;
-      throw new NarrationMissing(url);
+    } catch (e) {
+      if (this.current !== audio) return; // superseded: play() was aborted by stop()
+      this.current = null;
+      throw new NarrationMissing(url, e);
     }
   }
 
