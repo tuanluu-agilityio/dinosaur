@@ -16,7 +16,7 @@
     ],
     "files": { "high": "public/models/tyrannosaurus.high.glb", "low": "public/models/tyrannosaurus.low.glb" },
     "clips": { "idle": "idle", "walk": "walk", "roar": "roar" },
-    "status": "candidate"
+    "status": "approved"
   },
   {
     "species": "triceratops",
