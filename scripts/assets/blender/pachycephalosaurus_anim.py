@@ -161,10 +161,23 @@ def walk_frame(rig, t):
             psi = -heel
         else:                               # swing
             u = (ph - DUTY) / (1 - DUTY)
-            ty = TIP_REST.y + STRIDE / 2 - STRIDE * smooth(u)
-            tz = TIP_REST.z + LIFT * math.sin(math.pi * min(u * 1.15, 1.0)) ** 1.3
-            heel = math.radians(16.0) * (1 - smooth(u * 2.0)) - math.radians(3.0) * smooth((u - 0.4) / 0.6) * (1 - smooth((u - 0.85) / 0.15))
-            psi = math.radians(20.0) * math.sin(math.pi * min(u * 1.1, 1.0)) - heel * (1 - smooth(u * 3.0))
+            # Hermite from the lift-off point to a touchdown point at u = LAND; both end tangents equal the ground
+            # velocity (+y at WALK_SPEED). From u = LAND to the end of the swing the toe is already on the floor and
+            # keeps moving with it at exactly the ground speed, so it is locked from the first ground-height frame.
+            LAND = 0.8
+            sw = WALK_SPEED * WALK_T * (1 - DUTY)       # ground travel during the whole swing phase (m)
+            p0, p1 = TIP_REST.y + STRIDE / 2, TIP_REST.y - STRIDE / 2
+            if u < LAND:
+                v = u / LAND
+                pl = p1 - sw * (1 - LAND)
+                h00, h10, h01, h11 = 2 * v**3 - 3 * v**2 + 1, v**3 - 2 * v**2 + v, -2 * v**3 + 3 * v**2, v**3 - v**2
+                ty = h00 * p0 + h10 * sw * LAND + h01 * pl + h11 * sw * LAND
+            else:
+                v = 1.0
+                ty = p1 - sw * (1 - u)
+            tz = TIP_REST.z + LIFT * math.sin(math.pi * v)
+            heel = math.radians(16.0) * (1 - smooth(v * 2.0))
+            psi = math.radians(14.0) * math.sin(math.pi * v) ** 3 - heel * (1 - smooth(v * 3.0))
         leg_ik(rig, side, Vector((sx, ty, tz)), heel, psi)
 
 
@@ -216,24 +229,42 @@ def author(arm):
 
 
 def diag(arm, mesh):
-    """Print the lowest foot vertex over the walk cycle (foot-on-ground / planting check)."""
+    """Frame-by-frame check on one fixed toe-nail vertex per foot: while it is at ground height (z < 1.5 cm over
+    the lowest point of the cycle) its y must move by +WALK_SPEED/24 = 0.0292 m per frame (= 5.4 px at 185 px/m)."""
     rig = Rig(arm)
     bpy.context.view_layer.objects.active = arm
     bpy.ops.object.mode_set(mode="POSE")
     for pb in arm.pose.bones:
         pb.rotation_mode = "QUATERNION"
-    for k in range(0, 21):
-        t = k / 20
-        walk_frame(rig, t)
+    n = int(round(WALK_T * FPS))
+    walk_frame(rig, 0.0)
+    bpy.context.view_layer.update()
+    dg = bpy.context.evaluated_depsgraph_get()
+    vs = [v.co.copy() for v in mesh.evaluated_get(dg).data.vertices]
+    nails = {}
+    for side, sx in (("L", 1), ("R", -1)):
+        cand = [i for i, v in enumerate(vs) if v.x * sx > 0.1 and v.z < 0.25 and v.y < 0.0]
+        nails[side] = min(cand, key=lambda i: vs[i].y)
+    track = {"L": [], "R": []}
+    for f in range(n + 1):
+        walk_frame(rig, (f % n) / n)
         bpy.context.view_layer.update()
-        dg = bpy.context.evaluated_depsgraph_get()
-        e = mesh.evaluated_get(dg)
-        vs = [v.co for v in e.data.vertices]
+        e = mesh.evaluated_get(bpy.context.evaluated_depsgraph_get())
         for side in ("L", "R"):
-            sx = 1 if side == "L" else -1
-            foot = [v for v in vs if v.x * sx > 0.1 and v.z < 0.45 and v.y < 0.25]
-            lo = min(foot, key=lambda v: v.z)
-            print(f"diag t={t:.2f} {side} lowest foot vert z={lo.z:.3f} y={lo.y:.3f}")
+            p = e.data.vertices[nails[side]].co
+            track[side].append((p.y, p.z))
+    bad = 0
+    for side in ("L", "R"):
+        zmin = min(z for _, z in track[side])
+        for f in range(n):
+            y0, z0 = track[side][f]
+            y1, z1 = track[side][f + 1]
+            if z0 - zmin < 0.015 and z1 - zmin < 0.015:
+                dy = y1 - y0
+                ok = abs(dy - WALK_SPEED / FPS) < 0.0054 / 185 * 185 * 0.2 / 1.0 + 0.0011  # +-1 px at 185 px/m = 5.4 mm
+                bad += not ok
+                print(f"diag {side} f{f:02d} z={z0 - zmin:.4f} dy={dy * 1000:.1f} mm {'ok' if ok else 'SLIDE'}")
+    print("diag slide frames:", bad)
     bpy.ops.object.mode_set(mode="OBJECT")
 
 
@@ -286,7 +317,7 @@ def main():
         return
     bpy.context.scene.render.fps = FPS
     author(arm)
-    arm.animation_data.action = None   # park each action on its own NLA track so the exporter writes all
+    arm.animation_data.action = None   # park each of our clips (idle, walk only; source clips were dropped in prep) on its own NLA track
     for action in [a for a in bpy.data.actions if a.name in CLIPS]:
         tr = arm.animation_data.nla_tracks.new()
         tr.name = action.name
