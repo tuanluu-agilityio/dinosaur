@@ -139,19 +139,25 @@ async function measure(browser: Browser, profile: keyof typeof PROFILES, tier: T
   return { profile, tier, query: extra, stats: info.stats, frames: frames.length, medianMs: round(q(sorted, 0.5)), p95Ms: round(q(sorted, 0.95)), p99Ms: round(q(sorted, 0.99)), maxMs: round(sorted[sorted.length - 1] ?? NaN), longFrames, errors };
 }
 
+/** Idle-machine check (review round 2): an empty scene must stay smooth, not only on average. */
+const CONTROL_MAX_P95_MS = 4;
+const CONTROL_MAX_FRAME_MS = 50;
+const CONTROL_QUERY = 'particles=0&fog=0&godrays=0&trunks=0&shadows=0&dino=0';
+const controlOk = (c: { p95Ms: number; maxMs: number }) => c.p95Ms <= CONTROL_MAX_P95_MS && c.maxMs <= CONTROL_MAX_FRAME_MS;
+
 test.describe('atmosphere frame time', () => {
   test.skip(!PERF, 'set ATMO_PERF=1 on a machine with a hardware WebGPU adapter');
   test.describe.configure({ mode: 'serial' });
   test.setTimeout(180_000);
 
   test('control empty scene', async ({ browser }) => {
-    const r = await measure(browser, 'desktop', 'high', 'particles=0&fog=0&godrays=0&trunks=0&shadows=0&dino=0', 4);
-    meta.control = { medianMs: r.medianMs, p95Ms: r.p95Ms, maxMs: r.maxMs, maxAllowedP95Ms: 4 };
+    const r = await measure(browser, 'desktop', 'high', CONTROL_QUERY, 4);
+    meta.control = { medianMs: r.medianMs, p95Ms: r.p95Ms, maxMs: r.maxMs, maxAllowedP95Ms: CONTROL_MAX_P95_MS, maxAllowedFrameMs: CONTROL_MAX_FRAME_MS };
   });
 
   // Same empty scene on the throttled phone proxy: hitches here are the machine/browser, not the atmosphere.
   test('control empty scene phone', async ({ browser }) => {
-    const r = await measure(browser, 'phone', 'low', 'particles=0&fog=0&godrays=0&trunks=0&shadows=0&dino=0', 6);
+    const r = await measure(browser, 'phone', 'low', CONTROL_QUERY, 6);
     meta.controlPhone = { medianMs: r.medianMs, p95Ms: r.p95Ms, maxMs: r.maxMs, longFrames: r.longFrames };
   });
 
@@ -167,6 +173,12 @@ test.describe('atmosphere frame time', () => {
     }
   }
 
+  test('control gate: machine idle (p95 <= 4 ms, max <= 50 ms)', () => {
+    const c = meta.control as { p95Ms: number; maxMs: number } | undefined;
+    test.skip(!c, 'control not measured');
+    expect(controlOk(c!), `control ${JSON.stringify(c)}: the machine is busy, rerun when idle`).toBe(true);
+  });
+
   test.afterAll(() => {
     if (!results.length) return;
     mkdirSync(dirname(OUT), { recursive: true });
@@ -175,5 +187,56 @@ test.describe('atmosphere frame time', () => {
       method: 'rAF interval, vsync + frame-rate limit off, 2 s warm-up; phone = 390x844 DPR3 + CPU throttle x4',
       layers: LAYERS, ...meta, results,
     }, null, 2));
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// Hitch A/B (review round 2, P3). Opt-in: ATMO_AB=1 npx playwright test atmosphere --workers=1 -g "hitch"
+// Rounds interleave full atmosphere vs atmosphere off (particles, fog, godrays off; same scene, lights,
+// shadows and T. rex) on phone/high and phone/medium, alternating arm order. A round counts only if an
+// empty-scene control right before AND right after it passes controlOk(); otherwise it is rejected
+// (kept in the log) and retried until ATMO_AB_ROUNDS valid rounds or the ATMO_AB_MINUTES deadline.
+// Writes every frame > 50 ms with its time into the recording: test-results/hitch-ab.json.
+
+const AB = process.env.ATMO_AB === '1';
+const AB_ROUNDS = Number(process.env.ATMO_AB_ROUNDS ?? 5);
+const AB_MINUTES = Number(process.env.ATMO_AB_MINUTES ?? 30);
+const AB_OUT = process.env.ATMO_AB_OUT ?? 'test-results/hitch-ab.json';
+const ARMS = { full: '', off: 'particles=0&fog=0&godrays=0' } as const;
+
+test.describe('atmosphere hitch A/B', () => {
+  test.skip(!AB, 'set ATMO_AB=1 on a machine with a hardware WebGPU adapter');
+
+  test('hitch A/B: interleaved full vs atmosphere off on phone', async ({ browser }) => {
+    test.setTimeout((AB_MINUTES + 20) * 60_000);
+    const deadline = Date.now() + AB_MINUTES * 60_000;
+    const valid: unknown[] = [];
+    const rejected: unknown[] = [];
+    const ctl = async () => {
+      const c = await measure(browser, 'desktop', 'high', CONTROL_QUERY, 4);
+      return { p95Ms: c.p95Ms, maxMs: c.maxMs, ok: controlOk(c) };
+    };
+    const save = () => {
+      mkdirSync(dirname(AB_OUT), { recursive: true });
+      writeFileSync(AB_OUT, JSON.stringify({ date: new Date().toISOString(), seconds: SECONDS, control: { maxP95Ms: CONTROL_MAX_P95_MS, maxFrameMs: CONTROL_MAX_FRAME_MS, query: CONTROL_QUERY }, arms: ARMS, valid, rejected }, null, 2));
+    };
+    let attempt = 0;
+    while (valid.length < AB_ROUNDS && Date.now() < deadline) {
+      attempt++;
+      const before = await ctl();
+      if (!before.ok) { rejected.push({ attempt, at: new Date().toISOString(), before }); save(); await new Promise((r) => setTimeout(r, 30_000)); continue; }
+      const order = (attempt % 2 ? ['full', 'off'] : ['off', 'full']) as (keyof typeof ARMS)[];
+      const arms = [];
+      for (const tier of ['high', 'medium'] as const) {
+        for (const arm of order) {
+          const r = await measure(browser, 'phone', tier, ARMS[arm], SECONDS);
+          arms.push({ tier, arm, frames: r.frames, medianMs: r.medianMs, p95Ms: r.p95Ms, maxMs: r.maxMs, over100: r.longFrames.filter((f) => f[1] > 100).length, longFrames: r.longFrames, errors: r.errors });
+        }
+      }
+      const after = await ctl();
+      (after.ok ? valid : rejected).push({ attempt, at: new Date().toISOString(), before, after, arms });
+      save();
+    }
+    expect(valid.length, `valid rounds before the ${AB_MINUTES} min deadline (machine busy?)`).toBeGreaterThanOrEqual(AB_ROUNDS);
   });
 });
