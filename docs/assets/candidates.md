@@ -111,6 +111,22 @@ Round 1 top pick `b278ec123e054751a7937f8937949e80` is withdrawn. Round 2 found 
 - `b9b8bb6855ea40f49d8b2273fab19cf2` "Dino Dan - Dino Defence HD Edmontosaurus" (`spikedaboi`) and `389b630b630a4d2f92f88c13b57ee152` "Dino hunter Deadly Shores Edmontosaurus" (`PaPmont125513`): **rejected: provenance** (game-titled), low poly.
 - Skull, femur, ischium, tendon, jaw and tooth scans (for example `2055d7721e454bd8bd4019eb28e27e13`, `1b5b76556e454c2297422b7951ac9d96` which is CC BY-NC-SA, `92715619fb2b44849af36da71457ec15` skull): **excluded.** Fragments, not whole animals.
 
+### Round 3 (issue #23, user asked for another model): still NO CANDIDATE
+
+Queries tried (Sketchfab `downloadable=true`, then without the filter to see what exists): `hadrosaurid`, `hadrosaur`, `hadrosaur rigged`, `hadrosaur animated walk`, `saurolophine`, `edmontosaurus annectens`, `edmontosaurus regalis`, `edmontosaurus model`, `edmontosaurus rigged`, `edmontosaurus animated`, `edmontosaurus skeleton`, `edmontosaurus life restoration`, `edmonto`, `anatotitan`, `duck-billed dinosaur`, `Hell Creek hadrosaur`, `saurolophus`, `shantungosaurus`, `kritosaurus`, `brachylophosaurus`, `gryposaurus`, `maiasaura`, `corythosaurus`, `lambeosaurus`. Uploader catalogues: `hsejira`, `Hhhhhh66`, `DinoDanDragonMan`, `Danger_Floof`, `Dino_melt_stuff`. Web: Smithsonian, MorphoSource, Digital Atlas of Ancient Life, CGTrader/RenderHub/SuperHive (no free whole-animal E. annectens found).
+
+- `11eb8aeaf11245b799bcdc84d1a502b2` "Edmontosaurus" (`Danger_Floof`, CC-BY-4.0, 572 faces): **rejected: low-poly.**
+- `bb122e88530a4004a8f09e23d0830625` "TLWJP(Arcade) - Anatotitan/Edmontosaurus" (`ziggertron`, CC-BY-4.0, 1,247 faces): **rejected: arcade game rip, low-poly.**
+- `3da9f211ae304bd0afd1d15a290eabbd` "Maiasaura With Rig" (`DinoDanDragonMan`, CC-BY-4.0, 17,948 faces, rigged): **rejected: wrong species** (Maiasaura, Campanian Montana, not Hell Creek); Dino Dan lineage is game-sourced.
+- `d81a1c7f9f5145fe89b1416e598c39d2` "Accurate lambeosaurus rigged" (`Hhhhhh66`) and `ff429847f5344faebe5caa40055e6cc7` (`hsejira`), CC-BY-4.0: **rejected: wrong species (crested lambeosaurine); the "Accurate ..." series is the Prehistoric Kingdom rip lineage.**
+- `6e0e2bcae74e4a1c89537bc3aa0f682e` "LDA Saurolophus (No rig and texture)" (`Dino_melt_stuff`, CC-BY-4.0, 10,000 faces): **rejected: wrong species, untextured, unrigged.**
+- Dino Raul / `slang107123456789` / `SammyTheCitipati` hadrosaurs (Saurolophus, Maiasaura, Shantungosaurus, Corythosaurus): **rejected: wrong species and unnamed upstream chain** (same as the Dino Raul Edmontosaurus).
+- `6ddb19be075c455796f17502b9a3f899` "UW 15561 - Edmontosaurus copei, Skeleton" (`uwlibraries`, CC BY-NC, 132,958 faces) and `d4a26baf40724504981e07b81b55489b` (tendons and spine): **rejected: fossil skeleton scans, not a fleshed living animal.** Licence acceptable; subject is not.
+- Not downloadable (unusable, licence not checked): `caee180bca8e459c803849a4588e3fe6` Edmontosaurus Rig (`bill_nguyen`, sold on RenderHub/SuperHive), `b569fca4003948209b49d5e5f29fb919` (`AneesAnimates`), `29530f3bfac342f4bbe968197b9710d9` and `66c68db473dd4ac68a516148acccd477` (`robertfabiani`).
+- Smithsonian, MorphoSource and Digital Atlas of Ancient Life hold only bones, skulls and mounted skeletons for Edmontosaurus, no restoration.
+
+Options considered: hand-model one in Blender (own work), ask `bill_nguyen` about a licence, or close #23 not planned. **User decision: closed #23 as not planned (ADR 0004).**
+
 ## Pachycephalosaurus
 
 1. **TOP PICK: `740349873ae244ef8a19155b525d9193` "Pachycephalosaurus_animation"** (replaces `1fdb61b7…`, round 2)
