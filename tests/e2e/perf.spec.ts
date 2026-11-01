@@ -12,11 +12,13 @@ import { dirname } from 'node:path';
 
 const SECONDS = Number(process.env.PERF_SECONDS ?? 10);
 const EXTRA = process.env.PERF_QUERY ?? '';
+const RUNS = Number(process.env.PERF_RUNS ?? 3);
+const FOREST_EXTRA = process.env.PERF_FOREST_QUERY ?? '';
 const OUT = process.env.PERF_OUT ?? 'test-results/perf.json';
 const TIERS = ['high', 'medium', 'low'] as const;
 
 // Budget gates from ADR 0006: desktop high holds 60 fps; phone medium p95 <= 33 ms.
-const GATES: Record<string, number> = { 'desktop/high': 1000 / 60, 'phone/medium': 1000 / 30, 'forest desktop/high': 1000 / 60, 'forest phone/medium': 1000 / 30 };
+const GATES: Record<string, number> = { 'desktop/high': 1000 / 60, 'phone/medium': 1000 / 30, 'forest desktop/high': 10, 'forest phone/medium': 20 }; // forest rows: 60% of the frame (ADR 0010 section 2a)
 
 // An empty scene on any hardware GPU renders far faster than this; above it, other load is distorting the run.
 const CONTROL_MAX_MS = 4;
@@ -42,6 +44,8 @@ interface Result {
   errors: string[];
   /** Frames over 50 ms: [seconds into the recording, ms]. Tells a one-off hitch from steady jank. */
   longFrames: [number, number][];
+  /** p95 of every run when the scenario is repeated (forest rows); the row above is the run with the lowest p95. */
+  runsP95Ms?: number[];
 }
 
 const results: Result[] = [];
@@ -127,9 +131,19 @@ for (const profile of Object.keys(PROFILES) as (keyof typeof PROFILES)[]) {
 for (const profile of Object.keys(PROFILES) as (keyof typeof PROFILES)[]) {
   for (const tier of TIERS) {
     test(`forest ${profile} ${tier} frame time`, async ({ browser }) => {
-      const r = await measure(browser, profile, tier, 'play=loop', SECONDS, 'forest');
-      results.push(r);
-      test.info().annotations.push({ type: 'perf', description: `forest ${profile}/${tier}: median ${r.medianMs} ms, p95 ${r.p95Ms} ms (${r.frames} frames)` });
+      test.setTimeout(300_000);
+      // Spike method: best (minimum p95) of PERF_RUNS runs, each in a fresh browser.
+      let r: Result | undefined;
+      const runs: number[] = [];
+      for (let i = 0; i < RUNS; i++) {
+        const x = await measure(browser, profile, tier, `play=loop${FOREST_EXTRA ? `&${FOREST_EXTRA}` : ''}`, SECONDS, 'forest');
+        runs.push(x.p95Ms);
+        if (!r || x.p95Ms < r.p95Ms) r = x;
+      }
+      const best = r!;
+      best.runsP95Ms = runs;
+      results.push(best);
+      test.info().annotations.push({ type: 'perf', description: `forest ${profile}/${tier}: median ${best.medianMs} ms, p95 ${best.p95Ms} ms (${best.frames} frames)` });
     });
   }
 }
@@ -145,6 +159,7 @@ test('budget gates (ADR 0006, ADR 0010)', async () => {
   if (control) expect(control.p95Ms, 'empty-scene control p95 (ms): the machine is busy, rerun on an idle machine').toBeLessThanOrEqual(CONTROL_MAX_MS);
   for (const r of results) {
     const gate = GATES[`${r.scene === 'forest' ? 'forest ' : ''}${r.profile}/${r.tier}`];
+    if (r.scene === 'forest') expect.soft(r.maxMs, `forest ${r.profile}/${r.tier} longest frame (ms), rubric P3`).toBeLessThan(100);
     if (gate === undefined) continue;
     expect.soft(r.frames, `${r.scene} ${r.profile}/${r.tier} frames recorded`).toBeGreaterThan(SECONDS * 20);
     expect.soft(r.p95Ms, `${r.scene} ${r.profile}/${r.tier} p95 frame time (ms)`).toBeLessThanOrEqual(gate);
