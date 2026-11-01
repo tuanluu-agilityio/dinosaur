@@ -4,11 +4,13 @@
 // dinosaur clearing, in water, or inside the camera intro (isClearOfIntro, src/camera/paths.ts). Instancing pattern after
 // holtsetio/aurelia src/plankton.js @724aba26 (MIT). All geometry is procedural (docs/assets/flora.md).
 import {
-  BufferAttribute, BufferGeometry, DoubleSide, Euler, Group, InstancedMesh, Matrix4, MeshStandardNodeMaterial, Quaternion, Vector3,
+  BufferAttribute, BufferGeometry, DoubleSide, Euler, Group, InstancedBufferAttribute, InstancedMesh, Matrix4, MeshStandardNodeMaterial,
+  Quaternion, Vector3,
 } from 'three/webgpu';
+import type { Camera } from 'three/webgpu';
 import {
-  attribute, float, hash, instanceIndex, max, mix, normalView, normalize, positionLocal, sin, smoothstep, step, transformNormalToView, uv,
-  vec3, vec4, Fn,
+  attribute, float, hash, interleavedGradientNoise, max, mix, normalView, normalize, positionLocal, screenCoordinate, sin, smoothstep, step,
+  transformNormalToView, uniform, uv, vec3, vec4, Fn,
 } from 'three/tsl';
 import { BUDGETS } from '../core/budgets';
 import type { QualityTier } from '../core/quality';
@@ -56,13 +58,28 @@ const SPECS: Record<Species, Spec> = {
   conifer: { radius: 7, scale: [0.75, 1.15], xz: [0.8, 1.2], spheres: CONIFER_SPHERES },
   cycad: { radius: 3.2, scale: [0.8, 1.3], xz: [0.9, 1.1], spheres: [[3.2, 3.3]] },
   shrub: { radius: 1.1, scale: [0.6, 1.5], xz: [0.8, 1.2], spheres: [[1.8, 1.5]] },
-  fern: { radius: 0.55, scale: [0.55, 2.0], xz: [0.85, 1.15], spheres: [[1.2, 1.2]] },
+  fern: { radius: 0.55, scale: [0.55, 2.0], xz: [0.85, 1.15], spheres: [[1.2, 2.1]] }, // 1.2 m reach + 0.9 m sway
 };
 /** Placement order: big first so understory clusters can form under them. */
 const ORDER: Species[] = ['conifer', 'cycad', 'shrub', 'fern'];
 const UNDERSTORY = new Set<Species>(['shrub', 'fern']);
 
+/**
+ * Deterministic placement for a tier. Every tier is a prefix of one seeded list (generated at the high-tier size, or larger
+ * for perf-tuning overrides), so a tier switch only adds or removes plants and never moves one.
+ */
 export function placeVegetation(tier: QualityTier, seed = 20261031, counts: Record<Species, number> = vegetationCounts(tier)): Placements {
+  const high = vegetationCounts('high');
+  const totals = Object.fromEntries(ORDER.map((sp) => [sp, Math.max(counts[sp], high[sp])])) as Record<Species, number>;
+  const all = placeAll(seed, totals);
+  return Object.fromEntries(ORDER.map((sp) => [sp, all[sp].slice(0, counts[sp])])) as Placements;
+}
+
+const placeCache = new Map<string, Placements>();
+function placeAll(seed: number, totals: Record<Species, number>): Placements {
+  const ck = `${seed}:${ORDER.map((s) => totals[s]).join(',')}`;
+  const hit = placeCache.get(ck);
+  if (hit) return hit;
   // One random stream per species, so the first N conifers (and cycads) of a lower tier are the same plants as in a higher tier.
   const streams = Object.fromEntries(ORDER.map((s, i) => [s, rng(seed + 7919 * (i + 1))])) as Record<Species, () => number>;
   const gaussOf = (rand: () => number) => () => Math.sqrt(-2 * Math.log(1 - rand())) * Math.cos(TAU * rand());
@@ -76,29 +93,32 @@ export function placeVegetation(tier: QualityTier, seed = 20261031, counts: Reco
   // Understory patches: ferns and shrubs grow in clumps, not on a lattice.
   const patches: Array<{ x: number; z: number; s: number }> = [];
   const prand = rng(seed ^ 0x5bd1e995);
-  for (let i = 0; i < 160; i++) patches.push({ x: x0 + prand() * (x1 - x0), z: z0 + prand() * (z1 - z0), s: 2 + prand() * 4 });
+  for (let i = 0; i < 260; i++) patches.push({ x: x0 + prand() * (x1 - x0), z: z0 + prand() * (z1 - z0), s: 2.5 + prand() * 5 });
 
   for (const sp of ORDER) {
     const spec = SPECS[sp];
     const rand = streams[sp];
     const gauss = gaussOf(rand);
     let radius = spec.radius;
-    const target = counts[sp];
+    const target = totals[sp];
     let misses = 0;
-    const trees = [...out.conifer, ...out.cycad];
     while (out[sp].length < target) {
       let x: number, z: number;
       const mode = rand();
-      if (UNDERSTORY.has(sp) && radius > spec.radius * 0.4 && mode < 0.9) {
-        if (mode < 0.5 && trees.length) { // denser under the canopy
-          const t = trees[Math.floor(rand() * trees.length)];
+      if (UNDERSTORY.has(sp) && radius > spec.radius * 0.4 && mode < 0.8) {
+        if (mode < 0.4) { // denser under the canopy
+          // Plant k only clusters under trees of the same rank fraction, so it exists in a tier only with its tree.
+          const frac = (out[sp].length + 1) / target;
+          const nc = Math.max(1, Math.ceil(out.conifer.length * frac)), ny = Math.max(1, Math.ceil(out.cycad.length * frac));
+          const t = rand() < nc / (nc + ny) ? out.conifer[Math.floor(rand() * nc)] : out.cycad[Math.floor(rand() * ny)];
+          if (!t) continue;
           x = t.x + gauss() * 4.5; z = t.z + gauss() * 4.5;
         } else {
           const pt = patches[Math.floor(rand() * patches.length)];
           x = pt.x + gauss() * pt.s; z = pt.z + gauss() * pt.s;
         }
         if (x < x0 || x > x1 || z < z0 || z > z1) continue;
-      } else {
+      } else { // scattered cover between the clumps
         x = x0 + rand() * (x1 - x0);
         z = z0 + rand() * (z1 - z0);
       }
@@ -131,6 +151,7 @@ export function placeVegetation(tier: QualityTier, seed = 20261031, counts: Reco
       (grid.get(k) ?? grid.set(k, []).get(k)!).push({ x, z, sp });
     }
   }
+  placeCache.set(ck, out);
   return out;
 }
 
@@ -331,23 +352,41 @@ function leafMask(kind: LeafKind) {
   })();
 }
 
-function floraMaterial(opts: FloraStyle): MeshStandardNodeMaterial {
+/** Per-species tier fade: instances with rank in [to, from) fade out (and [from, to) fade in) as `p` runs 0 -> 1. */
+const fadeUniform = (v: number) => uniform(v);
+type U = ReturnType<typeof fadeUniform>;
+interface TierFade { from: U; to: U; p: U }
+/** Seconds a tier switch takes to fade plants in or out. */
+export const TIER_FADE_SECONDS = 0.5;
+
+/** Per-instance data (InstancedBufferAttribute 'inst'): world x, z of the plant and its rank in the seeded placement list. */
+const inst = () => attribute('inst', 'vec4');
+// Screen-door threshold: a stable per-pixel pattern, so fading plants dissolve instead of popping.
+const dither = () => interleavedGradientNoise(screenCoordinate.xy);
+function tierVisibility(f: TierFade) {
+  const rank = inst().z.add(0.5);
+  return mix(step(rank, f.from), step(rank, f.to), f.p);
+}
+
+function floraMaterial(opts: FloraStyle, fade: TierFade): MeshStandardNodeMaterial {
   const mat = new MeshStandardNodeMaterial({ side: DoubleSide, roughness: opts.roughness ?? 0.85, metalness: 0 });
   const bend = attribute('bend', 'float');
   const part = attribute('part', 'float');
+  const rank = inst().z;
   // Per-plant phase and strength so neighbours never sway in lockstep. Instanced positionLocal is already world
   // space (the instance matrix applies first), so the wind noise is sampled at world XZ.
-  const phase = hash(instanceIndex).mul(50);
-  const gain = mix(float(0.55), float(1.45), hash(instanceIndex.add(5)));
+  const phase = hash(rank).mul(50);
+  const gain = mix(float(0.55), float(1.45), hash(rank.add(5)));
   mat.positionNode = positionLocal.add(windOffset(positionLocal.xz.add(phase), bend, gain.mul(opts.strength)));
   const leafW = step(0.75, part), litW = step(0.25, part); // part: 0 bark, 0.5 twig (bark colour, lit from above), 1 foliage
-  mat.opacityNode = mix(float(1), leafMask(opts.kind), leafW);
+  const visible = step(dither(), tierVisibility(fade));
+  mat.opacityNode = mix(float(1), leafMask(opts.kind), leafW).mul(visible);
   mat.alphaTest = 0.5;
   mat.alphaToCoverage = true; // soft edges under MSAA instead of stair-stepped cut-outs
   // Leaf cards light from above on both faces (no black undersides): foliage normals point up whichever side is seen.
   const upView = transformNormalToView(vec3(0, 1, 0));
   let normal = mix(normalView, upView, litW.mul(0.85));
-  const tint = mix(float(0.82), float(1.15), hash(instanceIndex.add(11)));
+  const tint = mix(float(0.82), float(1.15), hash(rank.add(11)));
   const foliage = mix(vec3(...opts.dark), vec3(...opts.light), uv().y.mul(0.6).add(bend.mul(0.4))).mul(tint);
   const streaks = float(0.85).add(sin(uv().x.mul(TAU * 20)).mul(0.1)).add(sin(uv().x.mul(TAU * 7).add(uv().y.mul(3))).mul(0.06));
   let bark = vec3(...(opts.bark ?? [0.2, 0.14, 0.09])).mul(streaks);
@@ -374,32 +413,63 @@ const CHUNK = 52;
 
 export interface Vegetation {
   group: Group;
-  /** InstancedMeshes per species, one per spatial chunk. */
+  /** InstancedMeshes per species, one per spatial chunk. `count` is the number of plants drawn (fading ones included). */
   meshes: Record<Species, InstancedMesh[]>;
+  /** Plants per species in the current tier. */
   counts: Record<Species, number>;
+  /** Placements of the current tier: a prefix of one seeded list, so switching tiers never moves a plant. */
   placements: Placements;
+  /** Switch tier in place: lower tiers fade the extra plants out over TIER_FADE_SECONDS, higher tiers fade them in. */
+  setTier(tier: QualityTier, want?: Record<Species, number>): void;
+  /** Advance fades (and level of detail); call once per frame. */
+  update(dtSec: number, camera?: Camera): void;
+  /** Free geometries and materials and detach from the scene. */
+  dispose(): void;
+}
+
+interface Chunk { mesh: InstancedMesh; ranks: number[]; extra: InstancedMesh[] }
+const countBelow = (ranks: number[], n: number) => { let k = 0; while (k < ranks.length && ranks[k] < n) k++; return k; };
+
+/** Geometry for one chunk: shares the species' vertex buffers and adds the per-instance 'inst' attribute. */
+function chunkGeometry(base: BufferGeometry, data: Float32Array): BufferGeometry {
+  const g = new BufferGeometry();
+  for (const [name, a] of Object.entries(base.attributes)) g.setAttribute(name, a);
+  g.setIndex(base.index);
+  g.setAttribute('inst', new InstancedBufferAttribute(data, 4));
+  return g;
 }
 
 export function createVegetation(tier: QualityTier, seed?: number, want?: Record<Species, number>): Vegetation {
-  const placements = placeVegetation(tier, seed, want);
-  const shadows = BUDGETS[tier].shadows;
+  const counts = { ...(want ?? vegetationCounts(tier)) };
+  // Every species is built once at full (high-tier) capacity; a tier only changes how many of the ranked plants are drawn.
+  const high = vegetationCounts('high');
+  const capacity = Object.fromEntries(ORDER.map((sp) => [sp, Math.max(counts[sp], high[sp])])) as Record<Species, number>;
+  const full = placeVegetation('high', seed, capacity);
+  const fades = Object.fromEntries(ORDER.map((sp) => [sp, { from: fadeUniform(counts[sp]), to: fadeUniform(counts[sp]), p: fadeUniform(1) }])) as Record<Species, TierFade>;
   const defs: Record<Species, { geo: BufferGeometry; mat: MeshStandardNodeMaterial }> = {
-    fern: { geo: fernGeometry(), mat: floraMaterial({ kind: 'fern', dark: [0.07, 0.16, 0.05], light: [0.2, 0.36, 0.11], strength: 0.9 }) },
-    cycad: { geo: cycadGeometry(), mat: floraMaterial({ kind: 'cycad', dark: [0.04, 0.12, 0.05], light: [0.1, 0.24, 0.08], strength: 0.7, bark: [0.34, 0.26, 0.18], armor: true, roughness: 0.55 }) },
-    conifer: { geo: coniferGeometry(), mat: floraMaterial({ kind: 'needle', dark: [0.1, 0.2, 0.06], light: [0.33, 0.45, 0.12], strength: 1.8, bark: [0.34, 0.17, 0.1] }) },
-    shrub: { geo: shrubGeometry(), mat: floraMaterial({ kind: 'ovate', dark: [0.1, 0.2, 0.06], light: [0.3, 0.42, 0.12], strength: 0.9, bark: [0.25, 0.18, 0.1] }) },
+    fern: { geo: fernGeometry(), mat: floraMaterial({ kind: 'fern', dark: [0.07, 0.16, 0.05], light: [0.2, 0.36, 0.11], strength: 0.9 }, fades.fern) },
+    cycad: { geo: cycadGeometry(), mat: floraMaterial({ kind: 'cycad', dark: [0.04, 0.12, 0.05], light: [0.1, 0.24, 0.08], strength: 0.7, bark: [0.34, 0.26, 0.18], armor: true, roughness: 0.55 }, fades.cycad) },
+    conifer: { geo: coniferGeometry(), mat: floraMaterial({ kind: 'needle', dark: [0.1, 0.2, 0.06], light: [0.33, 0.45, 0.12], strength: 1.8, bark: [0.34, 0.17, 0.1] }, fades.conifer) },
+    shrub: { geo: shrubGeometry(), mat: floraMaterial({ kind: 'ovate', dark: [0.1, 0.2, 0.06], light: [0.3, 0.42, 0.12], strength: 0.9, bark: [0.25, 0.18, 0.1] }, fades.shrub) },
   };
   const shadowMat = new MeshStandardNodeMaterial({ colorWrite: false, side: DoubleSide });
-  shadowMat.positionNode = positionLocal.add(windOffset(positionLocal.xz.add(hash(instanceIndex).mul(50)), attribute('bend', 'float'), hash(instanceIndex.add(5)).mul(0.9).add(0.55).mul(1.8)));
+  shadowMat.positionNode = positionLocal.add(windOffset(positionLocal.xz.add(hash(inst().z).mul(50)), attribute('bend', 'float'), hash(inst().z.add(5)).mul(0.9).add(0.55).mul(1.8)));
+  shadowMat.maskShadowNode = tierVisibility(fades.conifer).greaterThan(dither());
   const shadowGeo = coniferShadowGeometry();
 
   const group = new Group();
   const meshes = { fern: [], cycad: [], conifer: [], shrub: [] } as Record<Species, InstancedMesh[]>;
-  const counts = {} as Record<Species, number>;
+  const chunks = { fern: [], cycad: [], conifer: [], shrub: [] } as Record<Species, Chunk[]>;
+  const owned: BufferGeometry[] = [];
+  const proxies: InstancedMesh[] = [];
   const m4 = new Matrix4(), q = new Quaternion(), eul = new Euler(0, 0, 0, 'YXZ'), s3 = new Vector3(), p3 = new Vector3();
-  const build = (geo: BufferGeometry, mat: MeshStandardNodeMaterial, list: Placement[], name: string): InstancedMesh => {
-    const mesh = new InstancedMesh(geo, mat, list.length);
-    list.forEach((p, i) => {
+  const build = (geo: BufferGeometry, mat: MeshStandardNodeMaterial, list: Array<[Placement, number]>, name: string): InstancedMesh => {
+    const data = new Float32Array(list.length * 4);
+    list.forEach(([p, rank], i) => data.set([p.x, p.z, rank, 0], i * 4));
+    const g = chunkGeometry(geo, data);
+    owned.push(g);
+    const mesh = new InstancedMesh(g, mat, list.length);
+    list.forEach(([p], i) => {
       q.setFromEuler(eul.set(p.tiltX, p.yaw, p.tiltZ));
       m4.compose(p3.set(p.x, p.y, p.z), q, s3.set(p.scaleXZ, p.scale, p.scaleXZ));
       mesh.setMatrixAt(i, m4);
@@ -411,25 +481,72 @@ export function createVegetation(tier: QualityTier, seed?: number, want?: Record
     return mesh;
   };
   for (const sp of ORDER) {
-    const cells = new Map<number, Placement[]>();
-    for (const p of placements[sp]) {
+    const cells = new Map<number, Array<[Placement, number]>>();
+    full[sp].forEach((p, rank) => {
       const k = Math.floor((p.z - WORLD.minZ) / CHUNK) * 64 + Math.floor((p.x - WORLD.minX) / CHUNK);
-      (cells.get(k) ?? cells.set(k, []).get(k)!).push(p);
-    }
+      (cells.get(k) ?? cells.set(k, []).get(k)!).push([p, rank]); // ranks ascend within a chunk
+    });
     for (const list of cells.values()) {
       const mesh = build(defs[sp].geo, defs[sp].mat, list, `flora-${sp}`);
-      mesh.receiveShadow = shadows && sp !== 'fern'; // ferns are low and dense: shadow lookups there cost frame time and show little
       group.add(mesh);
       meshes[sp].push(mesh);
-      if (sp === 'conifer' && shadows) {
+      const chunk: Chunk = { mesh, ranks: list.map(([, r]) => r), extra: [] };
+      if (sp === 'conifer') {
         // Only the cheap proxy casts shadows (layer SHADOW_LAYER, seen by the shadow camera but not the main one).
         const proxy = build(shadowGeo, shadowMat, list, 'flora-conifer-shadow');
         proxy.layers.set(SHADOW_LAYER);
-        proxy.castShadow = true;
         group.add(proxy);
+        chunk.extra.push(proxy);
+        proxies.push(proxy);
       }
+      chunks[sp].push(chunk);
     }
-    counts[sp] = placements[sp].length;
   }
-  return { group, meshes, counts, placements };
+
+  const applyShadows = (on: boolean) => {
+    // Ferns are low and dense: shadow lookups there cost frame time and show little.
+    for (const sp of ORDER) for (const m of meshes[sp]) m.receiveShadow = on && sp !== 'fern';
+    for (const p of proxies) p.castShadow = on;
+  };
+  applyShadows(BUDGETS[tier].shadows);
+  const fading = new Set<Species>();
+  const draw = (sp: Species, n: number) => {
+    for (const c of chunks[sp]) {
+      c.mesh.count = countBelow(c.ranks, n);
+      for (const e of c.extra) e.count = c.mesh.count;
+    }
+  };
+  const slice = () => Object.fromEntries(ORDER.map((sp) => [sp, full[sp].slice(0, counts[sp])])) as Placements;
+  const veg: Vegetation = {
+    group, meshes, counts, placements: slice(),
+    setTier(t, w) {
+      const next = w ?? vegetationCounts(t);
+      applyShadows(BUDGETS[t].shadows);
+      for (const sp of ORDER) {
+        const f = fades[sp];
+        const now = counts[sp];
+        const n = Math.min(Math.max(0, next[sp]), capacity[sp]);
+        f.from.value = now; f.to.value = n; f.p.value = n === now ? 1 : 0;
+        draw(sp, Math.max(now, n)); // plants fading out are still drawn until the fade ends
+        if (n !== now) fading.add(sp); else fading.delete(sp);
+        counts[sp] = n;
+      }
+      veg.placements = slice();
+    },
+    update(dt) {
+      for (const sp of fading) {
+        const f = fades[sp];
+        f.p.value = Math.min(1, (f.p.value as number) + dt / TIER_FADE_SECONDS);
+        if ((f.p.value as number) >= 1) { f.from.value = counts[sp]; draw(sp, counts[sp]); fading.delete(sp); }
+      }
+    },
+    dispose() {
+      group.removeFromParent();
+      for (const g of owned) g.dispose();
+      for (const sp of ORDER) { defs[sp].geo.dispose(); defs[sp].mat.dispose(); }
+      shadowGeo.dispose(); shadowMat.dispose();
+    },
+  };
+  for (const sp of ORDER) draw(sp, counts[sp]);
+  return veg;
 }

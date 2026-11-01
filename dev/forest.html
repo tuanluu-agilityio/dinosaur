@@ -57,12 +57,12 @@
       scene.add(terrain.group);
 
       // Count overrides are for perf tuning only; budgets live in BUDGETS.
-      const makeVeg = (t) => {
+      const want = (t) => {
         const base = BUDGETS[t];
         const num = (k, d) => (q.has(k) ? Math.max(0, Number(q.get(k))) : d);
-        return createVegetation(t, undefined, { fern: num('ferns', base.ferns), cycad: num('cycads', base.cycads), conifer: num('conifers', base.conifers), shrub: num('shrubs', base.shrubs) });
+        return { fern: num('ferns', base.ferns), cycad: num('cycads', base.cycads), conifer: num('conifers', base.conifers), shrub: num('shrubs', base.shrubs) };
       };
-      let veg = makeVeg(tier);
+      const veg = createVegetation(tier, undefined, want(tier));
       scene.add(veg.group);
 
       const camera = new PerspectiveCamera(50, 1, 0.1, 500);
@@ -125,7 +125,7 @@
       let count = 0, recording = false, last = performance.now(), elapsed = 0;
       let t0 = null;
       const play = q.get('play') ?? 'still';
-      const frame = () => {
+      const frame = (dt) => {
         const now = performance.now();
         if (recording && count < MAX) frames[count++] = now - last;
         last = now;
@@ -134,6 +134,7 @@
         if (play === 'intro') setView('intro', Math.min(1, elapsed / INTRO_DURATION));
         else if (play === 'loop') setView('intro', (elapsed % INTRO_DURATION) / INTRO_DURATION);
         follow();
+        veg.update(dt, camera);
         renderer.render(scene, camera);
       };
       window.__spike = {
@@ -151,12 +152,10 @@
         terrainHeight, inClearing, riverX, camera, anchor,
         /** Render one frame with the camera at view/u (for deterministic capture). */
         renderAt(v, u = 0) { setView(v, u); follow(); renderer.render(scene, camera); },
-        /** Live tier switch like the FpsGovernor will do: swap flora and shadows, compile, render. */
+        /** Live tier switch like the FpsGovernor will do: flora fades to the new tier's prefix, shadows follow the budget. */
         async setTier(t) {
           tier = pickTier(t);
-          scene.remove(veg.group);
-          veg = makeVeg(tier);
-          scene.add(veg.group);
+          veg.setTier(tier, want(tier));
           shadows = BUDGETS[tier].shadows && !q.has('noshadow');
           renderer.shadowMap.enabled = shadows;
           sun.castShadow = shadows;
