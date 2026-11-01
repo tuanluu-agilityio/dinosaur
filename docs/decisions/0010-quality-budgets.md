@@ -12,9 +12,9 @@ ADR 0006 asks for 60 fps on a mid-range desktop and p95 ≤ 33 ms on a mid-range
 
    | Tier | Ferns | Particles | Shadows | Dino variant | Texture max | Cycads / conifers | Godrays / Verlet |
    |---|---|---|---|---|---|---|---|
-   | high | 6000 | 20000 | on | high | 2048 | 600 / 240 (provisional) | on / on (provisional) |
-   | medium | 3000 | 10000 | off | low | 1024 | 300 / 120 (provisional) | off / off |
-   | low | 1500 | 5000 | off | low | 1024 | 150 / 60 (provisional) | off / off |
+   | high | 6000 | 20000 | on | high | 2048 | 450 / 180 (provisional) | on / on (provisional) |
+   | medium | 3000 | 10000 | off | low | 1024 | 225 / 90 (provisional) | off / off |
+   | low | 1500 | 5000 | off | low | 1024 | 110 / 45 (provisional) | off / off |
 
 2. The spike's content (ferns, particles, one dinosaur) may use at most half of the frame budget. The other half is reserved for the rest of the scene. On desktop high that is p95 ≤ 8.3 ms. On the phone proxy at medium it is p95 ≤ 16.7 ms, and medium then takes half of the proxy's maximum because the proxy cannot slow the GPU.
 2a. The forest (terrain, all flora, water, shadows; scenario `dev/forest.html`) may use at most 60% of the frame, because dinosaurs, particles and godrays need the other 40%: p95 <= 10.0 ms on desktop high and p95 <= 20.0 ms on the phone proxy at medium (orchestrator decision on PR #71; priority smooth > realism > forest density). Forest rows are measured as the minimum p95 of 3 runs, each in a fresh browser, and no forest row may have a frame over 100 ms.
@@ -26,7 +26,7 @@ ADR 0006 asks for 60 fps on a mid-range desktop and p95 ≤ 33 ms on a mid-range
    - no scenario logs a console error
 
    On software adapters (CI without a GPU) the gate skips. That is not a pass.
-3a. Early-angiosperm shrubs have their own budget field, `shrubs` (450 high / 225 medium / 110 low), added by the forest task (#25). Provisional until the forest scenario of the gate measures it. Task #25 lowered the provisional cycad/conifer/shrub counts to fit the forest share in 2a (high 600/240/450, medium 300/120/225, low 150/60/110) before changing any code.
+3a. Early-angiosperm shrubs have their own budget field, `shrubs` (450 high / 225 medium / 110 low), added by the forest task (#25). Provisional until the forest scenario of the gate measures it. Task #25 lowered the provisional cycad/conifer/shrub counts to fit the forest share in 2a (high 450/180/450, medium 225/90/225, low 110/45/110, after a second measurement showed the first cut was not enough) before changing any code.
 4. "Provisional" values were not measured by the spike. The task that adds each feature (forest vegetation, godrays, Verlet) must measure it with the gate. If it is over budget, lower the number first and change code second, in separate commits (`docs/conventions/performance.md`).
 
 ## Consequences
