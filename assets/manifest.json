@@ -33,9 +33,17 @@
     "sourceUrl": "https://sketchfab.com/3d-models/pachycephalosaurus-animation-740349873ae244ef8a19155b525d9193",
     "author": "seirogan",
     "license": "CC-BY-4.0",
-    "modifications": [],
-    "files": { "high": "assets/src/pachycephalosaurus/high.glb", "low": "assets/src/pachycephalosaurus/low.glb" },
-    "clips": {},
+    "modifications": [
+      "Imported source FBX (rigged, 489,096 faces); baked its rest pose and discarded the source armature, its weights and its only clip 'Armature|paki' (a travelling leap, not an idle or walk); uniformly scaled to a 4.5 m nose-to-tail animal (factor 0.218), feet on z=0 (scripts/assets/blender/pachycephalosaurus_prep.py)",
+      "Decimated 489k -> 136,946 triangles with Blender collapse decimation (ratio 0.28; head, dome, nodes and limbs weighted to keep more triangles; UVs kept), smooth shading; the source normal map carries the fine detail",
+      "Rebuilt one PBR material from the source maps: base colour + tangent normal map, both resized 4096 -> 2048 px; the source ships no roughness map so roughness is a constant 0.75",
+      "Authored a 27-bone armature (26 deform bones) (spine, neck, head, 6 tail bones, 2 legs x thigh/shin/foot/toes, 2 arms x 3) because the source clip and rig are unusable; joints placed from orthographic views; skinned with Blender automatic weights, separate shells bound rigidly, max 4 influences per vertex; no jaw bone (mouth stays closed, so no jaw or throat tearing is possible) (scripts/assets/blender/pachycephalosaurus_rig.py)",
+      "Authored clips idle (4.0 s breathing, weight shift, small head and tail drift) and walk (1.75 s, 0.7 m/s, toe tips planted via analytic 2-bone IK, 6 cm double-step body bob, stiff tail counter-swing) procedurally at 24 fps; every clip loops (last key = first) (scripts/assets/blender/pachycephalosaurus_anim.py)",
+      "Rest pose kept as in the source (standing, both feet flat on the ground, dome with bony nodes, 3 toes per foot visible); no re-pose needed. Source texture left untouched (no blur, no flattening)",
+      "Optimized with scripts/assets/optimize.mjs: high = full decimated mesh, 2048 px KTX2; low = 35 % of high triangles, 1024 px KTX2; meshopt"
+    ],
+    "files": { "high": "public/models/pachycephalosaurus.high.glb", "low": "public/models/pachycephalosaurus.low.glb" },
+    "clips": { "idle": "idle", "walk": "walk" },
     "status": "candidate"
   }
 ]

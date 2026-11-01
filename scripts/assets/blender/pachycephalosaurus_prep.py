@@ -6,7 +6,7 @@ Steps (each is listed in assets/manifest.json modifications):
   * import the FBX, bake the rest pose (the source clip is a leap that travels, so it is not shipped),
     drop the source armature (25 coarse bones) and its weights
   * uniformly scale to a 4.5 m nose-to-tail animal, feet on z=0
-  * collapse-decimate 489k -> ~60k triangles, head and dome kept denser (vertex-group weighted)
+  * collapse-decimate 489k -> ~137k triangles, head, dome and limbs kept denser (vertex-group weighted)
   * one PBR material: base colour 2048 px, tangent normal map 2048 px, flat roughness 0.75 (source has no roughness)
 Coordinates: -Y is forward, +Z up (glTF default after export).
 """
@@ -24,7 +24,7 @@ HEAD_W = 0.1
 def main():
     argv = sys.argv[sys.argv.index("--") + 1:]
     src, out = os.path.abspath(argv[0]), os.path.abspath(argv[1])
-    ratio = float(argv[argv.index("--ratio") + 1]) if "--ratio" in argv else 0.2
+    ratio = float(argv[argv.index("--ratio") + 1]) if "--ratio" in argv else 0.28
     global HEAD_W
     HEAD_W = float(argv[argv.index("--headw") + 1]) if "--headw" in argv else HEAD_W
     bpy.ops.wm.read_factory_settings(use_empty=True)
@@ -68,7 +68,7 @@ def main():
     vg = mesh.vertex_groups.new(name="keep")
     head_y = ymin + 1.0   # front metre (skull, dome, nodes) keeps more triangles
     for v in mesh.data.vertices:
-        w = HEAD_W if v.co.y < head_y else 1.0
+        w = HEAD_W if (v.co.y < head_y or v.co.z < 1.0) else 1.0   # head and limbs keep more triangles
         vg.add([v.index], w, "REPLACE")
     # triangulate first so the ratio is in triangles
     bm = bmesh.new()
