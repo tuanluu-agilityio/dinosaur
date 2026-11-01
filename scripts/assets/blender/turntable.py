@@ -105,7 +105,7 @@ def world_bounds():
     lo = Vector((1e9, 1e9, 1e9))
     hi = Vector((-1e9, -1e9, -1e9))
     for o in bpy.context.scene.objects:
-        if o.type != "MESH":
+        if o.type != "MESH" or o.name.startswith("Icosphere"):  # Icosphere = the glTF importer's bone-shape helper
             continue
         for corner in o.bound_box:
             p = o.matrix_world @ Vector(corner)
@@ -302,6 +302,16 @@ def main():
     prefix = opts["prefix"] or os.path.splitext(os.path.basename(model))[0]
     scene = setup_scene(opts)
     bpy.ops.import_scene.gltf(filepath=os.path.abspath(model))
+    for o in bpy.data.objects:  # the importer's bone-shape helper must not render or count toward the bounds
+        if o.name.startswith("Icosphere"):
+            o.hide_render = True
+            o.hide_viewport = True
+    idle = bpy.data.actions.get("idle")
+    for o in bpy.data.objects:  # stills show the standing pose (both feet planted) when the model has an idle clip
+        if idle and o.type == "ARMATURE":
+            if o.animation_data is None:
+                o.animation_data_create()
+            o.animation_data.action = idle
     src_fps = scene.render.fps / (scene.render.fps_base or 1.0)  # the importer keeps the file's authoring rate
     scene.frame_set(1)
     bpy.context.view_layer.update()
