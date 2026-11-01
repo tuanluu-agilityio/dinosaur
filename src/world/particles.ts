@@ -153,8 +153,9 @@ export class Particles {
     this._count = next;
     this.keep.value = next;
     if (shrinking) {
+      // A fade already running keeps its value; restarting it at 1 would flash the leaving particles back.
+      if (!this.fading) this.fade.value = 1;
       this.fading = true;
-      this.fade.value = 1;
     } else {
       this.fading = false;
       this.fade.value = 1;

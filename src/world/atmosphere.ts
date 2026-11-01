@@ -3,8 +3,9 @@
 // Nothing here uses compute nodes, so the WebGL2 fallback (isWebGPU = false) builds the same scene;
 // the flag is kept so a future compute effect can be gated on it. The e2e checks this through
 // renderer.info.compute.calls, not through a flag of ours.
-// Tier downgrades cross-fade (particles, godrays) over ~1.2 s instead of popping. Tiers without a
-// shadow map get contact shadows (soft discs under registered objects) and groundContactAO.
+// Tier downgrades cross-fade over 1.2 s instead of popping: dropped particles and godrays fade out, the
+// shadow map fades out while contact shadows (soft discs under registered objects) fade in. Materials
+// of objects standing on the ground can also use groundContactAO (lighting.ts) as their aoNode.
 // Sky/fog colour shared with godrays after holtsetio/aurelia src/background.js @724aba26 (MIT).
 import { Color, type Camera, type Scene, type WebGPURenderer } from 'three/webgpu';
 import {
@@ -22,6 +23,8 @@ export interface AtmosphereOptions {
   isWebGPU: boolean;
   /** Dev/perf only: override budget fields or switch the fog off. */
   overrides?: Partial<Pick<Budget, 'particles' | 'godrays' | 'shadows'>> & { fog?: boolean };
+  /** Max contact-shadow discs (trunks + dinosaurs). Default 512. */
+  contactCapacity?: number;
 }
 
 export interface AtmosphereStats {
@@ -67,7 +70,7 @@ export class Atmosphere {
   readonly horizon = new Color(0x9fb3a6);
   readonly zenith = new Color(0x7f9fb4);
 
-  constructor(private readonly scene: Scene, renderer: WebGPURenderer, opts: AtmosphereOptions & { contactCapacity?: number }) {
+  constructor(private readonly scene: Scene, renderer: WebGPURenderer, opts: AtmosphereOptions) {
     this._tier = opts.tier;
     this.overrides = opts.overrides ?? {};
     this.fogOn = this.overrides.fog ?? true;
@@ -86,7 +89,7 @@ export class Atmosphere {
     this.particles = new Particles(b.particles, { sunDir });
     scene.add(this.particles.mesh);
     this.contactShadows = new ContactShadows(opts.contactCapacity ?? 512);
-    this.contactShadows.mesh.visible = !b.shadows;
+    this.contactShadows.setEnabled(!b.shadows, true);
     scene.add(this.contactShadows.mesh);
     this.applyGodrays(b.godrays, true);
   }
@@ -102,12 +105,13 @@ export class Atmosphere {
     this.particles.setCount(b.particles);
     this.applyGodrays(b.godrays);
     if (this.lighting.shadows !== b.shadows) this.lighting.setShadows(b.shadows);
-    this.contactShadows.mesh.visible = !b.shadows;
+    this.contactShadows.setEnabled(!b.shadows);
   }
 
   /** Per frame: sun frustum follows the camera, tier fades advance. No allocation. */
   update(camera: Camera, dt: number): void {
-    this.lighting.update(camera.position);
+    this.lighting.update(camera.position, dt);
+    this.contactShadows.update(dt);
     this.particles.update(dt);
     this.godrays?.update(dt);
   }
@@ -120,8 +124,8 @@ export class Atmosphere {
       godrays: this.godrays?.enabled ?? false,
       shadows: this.lighting.shadows,
       fog: this.fogOn,
-      contactShadows: this.contactShadows.mesh.visible && this.contactShadows.mesh.count > 0,
-      transitioning: this.particles.transitioning || (this.godrays?.transitioning ?? false),
+      contactShadows: this.contactShadows.enabled && this.contactShadows.mesh.count > 0,
+      transitioning: this.particles.transitioning || (this.godrays?.transitioning ?? false) || this.lighting.transitioning,
     };
   }
 

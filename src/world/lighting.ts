@@ -16,6 +16,8 @@ export const SUN_AZIMUTH_DEG = 35;
 const SHADOW_HALF_EXTENT = 30; // metres around the focus point
 const SHADOW_MAP = 2048;
 const SUN_DISTANCE = 80;
+/** Same length as the particle and godray fades. */
+export const SHADOW_FADE_SEC = 1.2;
 
 /** Unit vector pointing from the scene towards the sun. */
 export function sunDirection(elevationDeg = SUN_ELEVATION_DEG, azimuthDeg = SUN_AZIMUTH_DEG, out = new Vector3()): Vector3 {
@@ -34,6 +36,7 @@ export class Lighting {
   readonly sunColor = new Color(0xffe2b8);
   readonly object = new Object3D();
   private _shadows = false;
+  private fadingOut = false;
   private readonly texel = (SHADOW_HALF_EXTENT * 2) / SHADOW_MAP;
   private readonly snapped = new Vector3();
   // Shadow-camera basis (sun never moves): x = up × sunDir, y = sunDir × x.
@@ -55,23 +58,56 @@ export class Lighting {
     this.sun.shadow.normalBias = 0.03;
     this.object.add(this.hemi, this.sun, this.sun.target);
     scene.add(this.object);
-    this.setShadows(shadows);
-    this.update(this.snapped);
+    this.setShadows(shadows, true);
+    this.update(this.snapped, 0);
   }
 
+  /** Shadows wanted by the current tier (true while still fading in, false as soon as a fade-out starts). */
   get shadows(): boolean {
     return this._shadows;
   }
 
-  /** Changing this recompiles lit materials once; the quality governor only does it on downgrade. */
-  setShadows(on: boolean): void {
-    this._shadows = on;
-    this.sun.castShadow = on;
-    this.renderer.shadowMap.enabled = on;
+  /** A shadow fade-out is still running. */
+  get transitioning(): boolean {
+    return this.fadingOut;
   }
 
-  /** Keep the sun (and its shadow frustum) centred on `focus`. No allocation. */
-  update(focus: Vector3): void {
+  /**
+   * Turning shadows off ramps sun.shadow.intensity 1 -> 0 over SHADOW_FADE_SEC (a uniform, no
+   * recompile), and only then disables castShadow and the shadow map. That last step recompiles lit
+   * materials once, after the shadows are already invisible; the governor only does it on downgrade.
+   * Turning on (dev/tests only; the governor never upgrades) is immediate.
+   */
+  setShadows(on: boolean, immediate = false): void {
+    this._shadows = on;
+    if (on) {
+      this.fadingOut = false;
+      this.sun.shadow.intensity = 1;
+      this.sun.castShadow = true;
+      this.renderer.shadowMap.enabled = true;
+    } else if (immediate || !this.sun.castShadow) {
+      this.fadingOut = false;
+      this.disableShadowMap();
+    } else {
+      this.fadingOut = true;
+    }
+  }
+
+  private disableShadowMap(): void {
+    this.sun.shadow.intensity = 0;
+    this.sun.castShadow = false;
+    this.renderer.shadowMap.enabled = false;
+  }
+
+  /** Keep the sun (and its shadow frustum) centred on `focus` and advance a shadow fade. No allocation. */
+  update(focus: Vector3, dt: number): void {
+    if (this.fadingOut) {
+      this.sun.shadow.intensity = Math.max(0, this.sun.shadow.intensity - dt / SHADOW_FADE_SEC);
+      if (this.sun.shadow.intensity === 0) {
+        this.fadingOut = false;
+        this.disableShadowMap();
+      }
+    }
     // Snap the focus to whole shadow texels in the light's view plane; slide freely along the light ray.
     const s = this.texel;
     const x = Math.round(focus.dot(this.lx) / s) * s;
@@ -107,6 +143,9 @@ export class ContactShadows {
   readonly mesh: InstancedMesh;
   private used = 0;
   private readonly m = new Matrix4();
+  /** 0..1, cross-faded against the shadow map's fade-out. */
+  private readonly opacity = uniform(0);
+  private target = 0;
 
   constructor(capacity: number, strength = 0.7) {
     const geometry = new PlaneGeometry(2, 2);
@@ -118,12 +157,34 @@ export class ContactShadows {
     material.polygonOffsetUnits = -2;
     material.colorNode = uniform(new Color(0x0b0905));
     const r = uv().mul(2).sub(1).length();
-    material.opacityNode = float(1).sub(smoothstep(0.15, 1.0, r)).pow(1.6).mul(strength);
+    material.opacityNode = float(1).sub(smoothstep(0.15, 1.0, r)).pow(1.6).mul(strength).mul(this.opacity);
     this.mesh = new InstancedMesh(geometry, material, capacity);
     this.mesh.name = 'atmosphere.contactShadows';
     this.mesh.count = 0;
     this.mesh.renderOrder = 10; // after opaque ground, before particles
     this.mesh.frustumCulled = false;
+    this.mesh.visible = false;
+  }
+
+  /** Drawn (or fading in). */
+  get enabled(): boolean {
+    return this.target > 0;
+  }
+
+  /** Fade in/out over SHADOW_FADE_SEC (opposite to the shadow map's ramp); `immediate` skips the fade. */
+  setEnabled(on: boolean, immediate = false): void {
+    this.target = on ? 1 : 0;
+    if (immediate) this.opacity.value = this.target;
+    this.mesh.visible = on || this.opacity.value > 0;
+  }
+
+  /** Per frame. No allocation. */
+  update(dt: number): void {
+    const v = this.opacity.value;
+    if (v === this.target) return;
+    const step = dt / SHADOW_FADE_SEC;
+    this.opacity.value = this.target > v ? Math.min(1, v + step) : Math.max(0, v - step);
+    this.mesh.visible = this.opacity.value > 0;
   }
 
   /** Register a disc; returns its index for set(). */
@@ -147,6 +208,7 @@ export class ContactShadows {
 
   dispose(): void {
     this.mesh.removeFromParent();
+    this.mesh.dispose(); // frees the instance-matrix buffer
     this.mesh.geometry.dispose();
     (this.mesh.material as MeshBasicNodeMaterial).dispose();
   }
