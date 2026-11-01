@@ -36,7 +36,7 @@
     ],
     "files": { "high": "public/models/triceratops.high.glb", "low": "public/models/triceratops.low.glb" },
     "clips": { "idle": "idle", "walk": "walk", "eat": "eat" },
-    "status": "candidate"
+    "status": "approved"
   },
   {
     "species": "pachycephalosaurus",
