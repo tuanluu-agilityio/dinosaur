@@ -24,7 +24,7 @@ WALK_T = 2.4
 WALK_SPEED = 1.2                   # m/s of ground the stance foot travels back
 DUTY = 0.6
 STRIDE = WALK_SPEED * WALK_T * DUTY  # foot travel during stance (m)
-TIP_REST = Vector((0.0, -0.65, 0.08))   # yz of toe tip (x added per side)
+TIP_REST = Vector((0.0, -0.65, 0.09))   # yz of toe tip (x added per side)
 TAIL_CHAIN = ["tail1", "tail2", "tail3", "tail4", "tail5", "tail6"]
 
 
@@ -137,7 +137,7 @@ def walk_frame(rig, t):
     rig.reset()
     tau = 2 * math.pi * t
     s2 = math.cos(4 * math.pi * (t - 0.3))      # +1 at each mid-stance
-    bob = 0.055 * s2
+    bob = 0.09 * s2
     sway = 0.045 * math.sin(tau)
     yaw = math.radians(4.0) * math.sin(tau)
     pitch = math.radians(1.2) * s2
@@ -148,7 +148,7 @@ def walk_frame(rig, t):
     rig.fk("neck2", "neck1", (math.radians(-1.0) * math.sin(4 * math.pi * t + 1.0), 0, yaw * 0.3))
     rig.fk("head", "neck2", (math.radians(2.0) * math.sin(4 * math.pi * t + 1.4), 0, 0))
     rig.fk("jaw", "head", (JAW_CLOSE + math.radians(2.5) * (0.5 + 0.5 * math.sin(tau)), 0, 0))
-    pose_tail(rig, math.radians(7.0), tau + math.pi, pitch=math.radians(-1.5) * s2)
+    pose_tail(rig, math.radians(9.0), tau + math.pi, pitch=math.radians(-1.5) * s2)
     pose_arms(rig, math.radians(5.0) * math.sin(tau), math.radians(2.0))
     for side, sgn, off in (("L", 1.0, 0.0), ("R", -1.0, 0.5)):
         ph = (t + off) % 1.0

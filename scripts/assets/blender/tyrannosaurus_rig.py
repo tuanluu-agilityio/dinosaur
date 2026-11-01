@@ -102,6 +102,39 @@ def reweight_jaw(mesh):
         jaw.add([v.index], w, "REPLACE")
 
 
+def smooth_jaw(mesh, iters=12):
+    """Relax the jaw weight over the surface so isolated vertices behind the mouth corner cannot stay
+    behind while their neighbours swing up with the jaw (that tore grey spikes out of the throat)."""
+    jaw = mesh.vertex_groups["jaw"]
+    head = mesh.vertex_groups["head"]
+    verts = mesh.data.vertices
+    w = [0.0] * len(verts)
+    for v in verts:
+        for g in v.groups:
+            if g.group == jaw.index:
+                w[v.index] = g.weight
+    nbr = [[] for _ in verts]
+    for e in mesh.data.edges:
+        a, b = e.vertices
+        nbr[a].append(b)
+        nbr[b].append(a)
+    live = [v.index for v in verts if v.co.y < -3.75 and nbr[v.index]]
+    for _ in range(iters):
+        new = list(w)
+        for i in live:
+            new[i] = 0.5 * w[i] + 0.5 * sum(w[j] for j in nbr[i]) / len(nbr[i])
+        w = new
+    for i in live:
+        others = [(g.group, g.weight) for g in verts[i].groups if g.group != jaw.index]
+        tot = sum(wt for _, wt in others)
+        if tot > 0:
+            for gi, wt in others:
+                mesh.vertex_groups[gi].add([i], wt * (1 - w[i]) / tot, "REPLACE")
+        elif w[i] < 1.0:
+            head.add([i], 1 - w[i], "REPLACE")
+        jaw.add([i], w[i], "REPLACE")
+
+
 def islands(mesh):
     bm = bmesh.new()
     bm.from_mesh(mesh.data)
@@ -139,13 +172,35 @@ def nearest_bone(mesh, p):
     return bn
 
 
+_KD = None
+
+
+def nearest_skin(mesh, comp, big):
+    """Closest (distance, skin vertex index) between a shell and the main skin."""
+    best = (1e9, None)
+    for i in comp:
+        co, idx, dist = _KD.find(mesh.data.vertices[i].co)
+        if dist < best[0]:
+            best = (dist, idx)
+    return best
+
+
 def rigidify_islands(mesh, max_verts=4000):
     """Teeth/claws/eyes are separate shells: give every vertex of a small shell the shell's mean weights so
     it moves rigidly (a tooth straddling the jaw split would otherwise stretch into a spike)."""
     names = {g.index: g.name for g in mesh.vertex_groups}
     n_small = 0
     n_orphan = 0
-    for comp in islands(mesh):
+    comps = islands(mesh)
+    big = [i for c in comps if len(c) > max_verts for i in c]
+    from mathutils import kdtree
+    kd = kdtree.KDTree(len(big))
+    for k, i in enumerate(big):
+        kd.insert(mesh.data.vertices[i].co, i)
+    kd.balance()
+    global _KD
+    _KD = kd
+    for comp in comps:
         if len(comp) > max_verts:
             continue
         n_small += 1
@@ -162,9 +217,14 @@ def rigidify_islands(mesh, max_verts=4000):
         jaw_i = mesh.vertex_groups["jaw"].index
         cz = sum(mesh.data.vertices[i].co.z for i in comp) / len(comp)
         cy = sum(mesh.data.vertices[i].co.y for i in comp) / len(comp)
-        if cy < -4.0:  # teeth: whole shell follows the jaw or the head, by which side of the mouth plane it is on
+        if cy < -3.9:  # teeth: follow whichever jaw the skin they are rooted in follows
+            d, skin_i = nearest_skin(mesh, comp, big)
+            wj = {g.group: g.weight for g in mesh.data.vertices[skin_i].groups}.get(jaw_i, 0.0)
             split = 2.70 + 0.23 * min(max((-4.0 - cy) / 0.7, 0.0), 1.0)
-            acc = {jaw_i: 1.0} if cz < split else {mesh.vertex_groups["head"].index: 1.0}
+            big_shell = len(comp) > 400  # tongue: judge by where it sits, not by its root
+            below = cz < split + 0.05
+            to_jaw = below if big_shell else (below or wj > 0.2)
+            acc = {jaw_i: 1.0} if to_jaw else {mesh.vertex_groups["head"].index: 1.0}
             tot = 1.0
         for i in comp:
             for g in list(mesh.data.vertices[i].groups):
@@ -188,6 +248,7 @@ def main():
     print("groups", len(mesh.vertex_groups))
     bpy.context.view_layer.objects.active = mesh
     reweight_jaw(mesh)
+    smooth_jaw(mesh)
     rigidify_islands(mesh)
     bpy.ops.object.mode_set(mode="WEIGHT_PAINT")
     bpy.ops.object.vertex_group_limit_total(group_select_mode="BONE_DEFORM", limit=4)
