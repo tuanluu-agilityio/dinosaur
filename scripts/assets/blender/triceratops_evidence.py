@@ -7,6 +7,8 @@
   eatclose    head at 1.5 m while grazing, mid-chew                                   -> <prefix>-closeup-eat.png
   beakbelow   beak from 1 m below and in front, idle pose                             -> <prefix>-closeup-beak-below.png
   eatmax      grazing frame at maximum jaw opening, side view                         -> <prefix>-eat-max-jaw.png
+  diag        the 1 m close-up again for the shadow-terminator diagnosis: sun shadows ON -> <prefix>-closeup-1m-shadows.png,
+              base colour only (emission, no lighting) -> <prefix>-closeup-1m-unlit.png
   (close-ups switch the sun shadows off: EEVEE's self-shadow terminator draws light straight-edged wedges on the
    smooth brow/nasal skin that look like texture seams but are not in the texture, UVs or normals)
   idle|walk|eat  whole-animal clips (orthographic side view, ground + scrolling markers) -> <prefix>-clip-<name>.mp4 + -strip.png
@@ -102,6 +104,25 @@ def no_sun_shadows():
             o.data.use_shadow = False
 
 
+def make_unlit():
+    """Replace each material's surface by an emission of its base-colour input (no lighting, no normal map)."""
+    for m in bpy.data.materials:
+        if not m.use_nodes:
+            continue
+        nt = m.node_tree
+        b = next((n for n in nt.nodes if n.type == "BSDF_PRINCIPLED"), None)
+        out = next((n for n in nt.nodes if n.type == "OUTPUT_MATERIAL"), None)
+        if not b or not out:
+            continue
+        em = nt.nodes.new("ShaderNodeEmission")
+        src = b.inputs["Base Color"]
+        if src.links:
+            nt.links.new(src.links[0].from_socket, em.inputs["Color"])
+        else:
+            em.inputs["Color"].default_value = src.default_value
+        nt.links.new(em.outputs[0], out.inputs["Surface"])
+
+
 def build_ground(spacing):
     bpy.ops.mesh.primitive_plane_add(size=120, location=(0, 0, 0))
     g = bpy.context.active_object
@@ -171,9 +192,17 @@ def main():
     os.makedirs(out_dir, exist_ok=True)
     sc, cam, arm = setup(model)
     play(arm, "idle", 0)
-    if any(k in what for k in ("closeup", "eatclose", "beakbelow", "eatmax")):
+    if any(k in what for k in ("closeup", "eatclose", "beakbelow", "eatmax", "diag")):
         bpy.ops.mesh.primitive_plane_add(size=60, location=(0, 0, 0))
         bpy.context.active_object.data.materials.append(mat((0.34, 0.34, 0.34, 1)))
+    if "diag" in what:
+        play(arm, "idle", 0)
+        still(sc, cam, os.path.join(out_dir, f"{prefix}-closeup-1m-shadows.png"), HEAD + Vector((-0.8, -0.6, 0.25)).normalized() * 1.0, HEAD, 24)
+        no_sun_shadows()
+        make_unlit()
+        sc.view_settings.view_transform = "Standard"
+        still(sc, cam, os.path.join(out_dir, f"{prefix}-closeup-1m-unlit.png"), HEAD + Vector((-0.8, -0.6, 0.25)).normalized() * 1.0, HEAD, 24)
+        return
     if "closeup" in what or "beakbelow" in what or "eatmax" in what:
         no_sun_shadows()
     if "closeup" in what:

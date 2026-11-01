@@ -104,9 +104,9 @@ def fix_head(mesh):
     mesh.data.polygons.foreach_set("use_smooth", [True] * len(mesh.data.polygons))
 
 def seal_horn_bases(mesh, base, size):
-    """The brow and nasal horns are pale keratin shafts that pass through a dark skin collar, leaving a light sliver
-    where the collar does not reach the shaft. Classify horn vertices by their base-colour luminance, then flare
-    each horn base outwards along its normal (1 cm at the skin line, fading to 0 at 0.14 m) so the shaft fills the collar."""
+    """The brow and nasal horns are pale keratin shafts that pass through a dark skin collar; the collar lip does not
+    reach the shaft and leaves holes and light slivers. Classify horn vertices by base-colour luminance, flare
+    each shaft base 2.5 cm outwards (fading over 16 cm) so it overlaps the lip, pull the lip up to half-way towards the shaft (within 3 cm) to close slits, then relax the lip and the border ring."""
     from mathutils import kdtree
     buf = np.empty(size * size * 4, dtype=np.float32)
     base.pixels.foreach_get(buf)
@@ -122,40 +122,54 @@ def seal_horn_bases(mesh, base, size):
     verts = mesh.data.vertices
     horn = {i for i, ls in lum.items() if sum(ls) / len(ls) > 0.22 and verts[i].co.y < -2.2 and verts[i].co.z > 1.2}
     skin = [i for i in range(len(verts)) if i not in horn and verts[i].co.y < -2.2 and verts[i].co.z > 1.2]
-    kd = kdtree.KDTree(len(skin))
-    for i in skin:
+    kd = kdtree.KDTree(len(horn))
+    for i in horn:
         kd.insert(verts[i].co, i)
     kd.balance()
-    moved = 0
-    border = set()
-    for i in horn:
-        d = kd.find(verts[i].co)[2]
-        w = max(0.0, 1.0 - d / 0.14)
-        w = w * w * (3 - 2 * w)
+    kd_skin = kdtree.KDTree(len(skin))
+    for i in skin:
+        kd_skin.insert(verts[i].co, i)
+    kd_skin.balance()
+    smooth_t = lambda x: x * x * (3 - 2 * x)
+    ring = set()
+    tight = set()
+    for i in horn:                                   # flare each shaft base outwards so it overlaps the collar lip
+        d = kd_skin.find(verts[i].co)[2]
+        w = smooth_t(max(0.0, 1.0 - d / 0.16))
         if w > 0:
-            verts[i].co += verts[i].normal * (0.01 * w)
-            moved += 1
-        if d < 0.03:
-            border.add(i)
+            verts[i].co += verts[i].normal * (0.025 * w)
+        if d < 0.04:
+            ring.add(i)
+    for i in skin:                                   # skin within 6 cm of a shaft is part of the ragged collar lip
+        co, hi, d = kd.find(verts[i].co)
+        if d < 0.06:
+            ring.add(i)
+        if d < 0.035:
+            tight.add(i)
+        if d < 0.03:                                 # sink the lip half-way towards the shaft to close slits
+            verts[i].co = verts[i].co.lerp(verts[hi].co, 0.5 * (1.0 - d / 0.03))
     mesh.data.update()
-    bm = bmesh.new()                 # relax the horn/skin border so the flare leaves no stair-steps
+    bm = bmesh.new()
     bm.from_mesh(mesh.data)
     bm.verts.ensure_lookup_table()
-    relax(bm, grow({bm.verts[i] for i in border}, 1), 3, 0.4)
+    relax(bm, grow({bm.verts[i] for i in ring}, 1), 6, 0.5)   # round the lip and the shaft/skin border
+    bm.normal_update()
     bm.to_mesh(mesh.data)
     bm.free()
     mesh.data.update()
-    print("horn vertices", len(horn), "flared", moved)
+    mesh.data.polygons.foreach_set("use_smooth", [True] * len(mesh.data.polygons))
+    print("horn vertices", len(horn), "ring", len(ring))
+    return tight
 
 
-def flatten_beak_normals(mesh, nrm, size):
+def flatten_beak_normals(mesh, nrm, base, size):
     """Paint the tangent-space normal map flat over the UV footprint of the beak margin so the baked knob bumps
     do not shade through the smoothed geometry."""
     uv = mesh.data.uv_layers.active.data
     mask = np.zeros((size, size), dtype=bool)
     for poly in mesh.data.polygons:
         c = poly.center
-        if not (-3.45 < c.y < -2.5 and abs(c.x) < 0.6 and split_z(c.y) + 0.0 < c.z < split_z(c.y) + 0.18):
+        if not (-3.45 < c.y < -2.5 and abs(c.x) < 0.6 and split_z(c.y) - 0.05 < c.z < split_z(c.y) + 0.2):
             continue
         pts = [(uv[l].uv[0] * size, uv[l].uv[1] * size) for l in poly.loop_indices]
         for i in range(1, len(pts) - 1):
@@ -170,18 +184,72 @@ def flatten_beak_normals(mesh, nrm, size):
             b = ((tri[2, 1] - tri[0, 1]) * (xs - tri[2, 0]) + (tri[0, 0] - tri[2, 0]) * (ys - tri[2, 1])) / d
             inside = (a >= -0.05) & (b >= -0.05) & (1 - a - b >= -0.05)
             mask[ys[inside], xs[inside]] = True
-    buf = np.empty(size * size * 4, dtype=np.float32)
-    nrm.pixels.foreach_get(buf)
-    buf = buf.reshape(size, size, 4)
-    # feather: average mask over a 5 px box so the flat patch blends into the surrounding detail
+    # feather: average mask over a 5 px box so the patch blends into the surrounding skin
     m = mask.astype(np.float32)
     for _ in range(2):
         m = sum(np.roll(np.roll(m, dx, 0), dy, 1) for dx in range(-2, 3) for dy in range(-2, 3)) / 25.0
     m = np.clip(m * 1.6, 0, 1)[..., None]
+    buf = np.empty(size * size * 4, dtype=np.float32)
+    nrm.pixels.foreach_get(buf)
+    buf = buf.reshape(size, size, 4)
     flat = np.array([0.5, 0.5, 1.0, 1.0], dtype=np.float32)
-    buf = buf * (1 - m) + flat * m
-    nrm.pixels.foreach_set(buf.ravel())
+    nrm.pixels.foreach_set((buf * (1 - m) + flat * m).ravel())
+    # paint the baked tooth/scale outlines out of the base colour: replace the strip by a wide box blur of its
+    # surroundings (outlines are thin, so the blur is skin colour), blended with the same feathered mask
+    ys, xs = np.nonzero(mask)
+    pad = 24
+    y0, y1 = max(ys.min() - pad, 0), min(ys.max() + pad + 1, size)
+    x0, x1 = max(xs.min() - pad, 0), min(xs.max() + pad + 1, size)
+    bb = np.empty(size * size * 4, dtype=np.float32)
+    base.pixels.foreach_get(bb)
+    bb = bb.reshape(size, size, 4)
+    crop = bb[y0:y1, x0:x1].copy()
+    keep = (~mask[y0:y1, x0:x1]).astype(np.float32)[..., None]          # only unmasked pixels feed the blur
+    num, den = crop * keep, keep.copy()
+    r = 18
+    for axis in (0, 1):
+        num = sum(np.roll(num, k, axis) for k in range(-r, r + 1)) / (2 * r + 1)
+        den = sum(np.roll(den, k, axis) for k in range(-r, r + 1)) / (2 * r + 1)
+    for axis in (0, 1):
+        num = sum(np.roll(num, k, axis) for k in range(-r, r + 1)) / (2 * r + 1)
+        den = sum(np.roll(den, k, axis) for k in range(-r, r + 1)) / (2 * r + 1)
+    fill = num / np.maximum(den, 1e-4)
+    mc = m[y0:y1, x0:x1]
+    bb[y0:y1, x0:x1] = np.where(den > 1e-3, crop * (1 - mc) + fill * mc, crop)
+    base.pixels.foreach_set(bb.ravel())
     print("flattened normal texels", int(mask.sum()))
+
+def flatten_horn_normals(mesh, nrm, size, near):
+    """The baked normal map has small dark pits and specular slivers where the skin collar meets each horn shaft.
+    Paint the normal map flat (feathered) over the UV footprint of the skin faces touching the collar ring."""
+    uv = mesh.data.uv_layers.active.data
+    mask = np.zeros((size, size), dtype=bool)
+    for poly in mesh.data.polygons:
+        if not any(v in near for v in poly.vertices):
+            continue
+        pts = [(uv[l].uv[0] * size, uv[l].uv[1] * size) for l in poly.loop_indices]
+        for i in range(1, len(pts) - 1):
+            tri = np.array([pts[0], pts[i], pts[i + 1]])
+            x0, y0 = np.floor(tri.min(0)).astype(int) - 1
+            x1, y1 = np.ceil(tri.max(0)).astype(int) + 1
+            xs, ys = np.meshgrid(np.arange(max(x0, 0), min(x1, size)), np.arange(max(y0, 0), min(y1, size)))
+            d = (tri[1, 1] - tri[2, 1]) * (tri[0, 0] - tri[2, 0]) + (tri[2, 0] - tri[1, 0]) * (tri[0, 1] - tri[2, 1])
+            if abs(d) < 1e-9:
+                continue
+            a = ((tri[1, 1] - tri[2, 1]) * (xs - tri[2, 0]) + (tri[2, 0] - tri[1, 0]) * (ys - tri[2, 1])) / d
+            b = ((tri[2, 1] - tri[0, 1]) * (xs - tri[2, 0]) + (tri[0, 0] - tri[2, 0]) * (ys - tri[2, 1])) / d
+            inside = (a >= -0.05) & (b >= -0.05) & (1 - a - b >= -0.05)
+            mask[ys[inside], xs[inside]] = True
+    m = mask.astype(np.float32)
+    for _ in range(2):
+        m = sum(np.roll(np.roll(m, dx, 0), dy, 1) for dx in range(-2, 3) for dy in range(-2, 3)) / 25.0
+    m = np.clip(m * 1.6, 0, 1)[..., None]
+    buf = np.empty(size * size * 4, dtype=np.float32)
+    nrm.pixels.foreach_get(buf)
+    buf = buf.reshape(size, size, 4)
+    flat = np.array([0.5, 0.5, 1.0, 1.0], dtype=np.float32)
+    nrm.pixels.foreach_set((buf * (1 - m) + flat * m).ravel())
+    print("horn-collar normal texels flattened", int(mask.sum()))
 
 
 def main():
@@ -226,8 +294,9 @@ def main():
     buf[:, 1] = np.clip(channel(ro), 0.0, 1.0)
     buf[:, 2] = 0.0
     orm.pixels.foreach_set(buf.ravel())
-    flatten_beak_normals(mesh, nrm, TEX)
-    seal_horn_bases(mesh, base, TEX)
+    flatten_beak_normals(mesh, nrm, base, TEX)
+    near = seal_horn_bases(mesh, base, TEX)
+    flatten_horn_normals(mesh, nrm, TEX, near)
     for im in (base, nrm, orm):
         im.pack()
     bpy.data.images.remove(ao)
