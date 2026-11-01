@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Forest dev page</title>
+    <style>
+      html, body { margin: 0; height: 100%; background: #0b0f0c; overflow: hidden; }
+      canvas { display: block; width: 100%; height: 100%; }
+    </style>
+  </head>
+  <body>
+    <canvas id="scene"></canvas>
+    <script type="module">
+      import { Scene, PerspectiveCamera, Fog, Color, HemisphereLight, DirectionalLight, Vector3 } from 'three/webgpu';
+      import { createRenderer, startLoop } from '/src/core/renderer.ts';
+      import { BUDGETS } from '/src/core/budgets.ts';
+      import { createTerrain, terrainHeight, inClearing } from '/src/world/terrain.ts';
+      import { createVegetation, vegetationCounts } from '/src/world/vegetation.ts';
+      import { sampleIntro } from '/src/camera/paths.ts';
+
+      const q = new URLSearchParams(location.search);
+      const tier = ['low', 'medium', 'high'].includes(q.get('tier')) ? q.get('tier') : 'high';
+      const canvas = document.getElementById('scene');
+      const { renderer } = await createRenderer(canvas);
+      const scene = new Scene();
+      scene.background = new Color(0xa9bfa8);
+      scene.fog = new Fog(0xa9bfa8, 70, 280);
+      scene.add(new HemisphereLight(0xdfffe0, 0x3a3020, 1.4));
+      const sun = new DirectionalLight(0xfff0c8, 3);
+      sun.position.set(40, 70, 30);
+      scene.add(sun);
+      const terrain = createTerrain();
+      const veg = createVegetation(tier);
+      scene.add(terrain.group, veg.group);
+
+      const camera = new PerspectiveCamera(50, 1, 0.1, 500);
+      const resize = () => {
+        renderer.setSize(window.innerWidth, window.innerHeight, false);
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+      };
+      window.addEventListener('resize', resize);
+      resize();
+      const view = q.get('view') ?? 'valley';
+      const tgt = new Vector3();
+      if (view === 'intro') { sampleIntro(Number(q.get('u') ?? 0.3), camera.position, tgt); camera.lookAt(tgt); }
+      else if (view === 'reveal') { sampleIntro(1, camera.position, tgt); camera.lookAt(tgt); }
+      else { camera.position.set(-30, 14, 30); camera.lookAt(6, 4, -40); }
+
+      window.__dev = { tier, counts: veg.counts, expected: vegetationCounts(tier), budget: BUDGETS[tier], placements: veg.placements, terrainHeight, inClearing, meshes: veg.meshes, camera };
+      const draw = () => renderer.render(scene, camera);
+      if (!q.has('manual')) startLoop(draw);
+      else draw();
+      document.documentElement.dataset.ready = '1';
+    </script>
+  </body>
+</html>
