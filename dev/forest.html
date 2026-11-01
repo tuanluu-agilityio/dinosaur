@@ -12,24 +12,43 @@
   <body>
     <canvas id="scene"></canvas>
     <script type="module">
+      // Params: tier=low|medium|high, view=valley|reveal|intro(&u=0..1)|close|ground|shadow, play=intro|loop|still, manual
+      // (render once), noshadow. window.__spike has the same shape as the spike page so tests/e2e/perf.spec.ts can record it.
       import { Scene, PerspectiveCamera, Fog, Color, HemisphereLight, DirectionalLight, Vector3 } from 'three/webgpu';
       import { createRenderer, startLoop } from '/src/core/renderer.ts';
       import { BUDGETS } from '/src/core/budgets.ts';
-      import { createTerrain, terrainHeight, inClearing } from '/src/world/terrain.ts';
-      import { createVegetation, vegetationCounts } from '/src/world/vegetation.ts';
-      import { sampleIntro } from '/src/camera/paths.ts';
+      import { createTerrain, terrainHeight, inClearing, riverX } from '/src/world/terrain.ts';
+      import { createVegetation } from '/src/world/vegetation.ts';
+      import { sampleIntro, INTRO_DURATION } from '/src/camera/paths.ts';
 
       const q = new URLSearchParams(location.search);
       const tier = ['low', 'medium', 'high'].includes(q.get('tier')) ? q.get('tier') : 'high';
+      const shadows = BUDGETS[tier].shadows && !q.has('noshadow');
       const canvas = document.getElementById('scene');
-      const { renderer } = await createRenderer(canvas);
+      const { renderer, isWebGPU } = await createRenderer(canvas);
+      renderer.shadowMap.enabled = shadows;
+
+      let adapter = 'unknown';
+      try {
+        const info = (await navigator.gpu?.requestAdapter())?.info;
+        if (info) adapter = [info.vendor, info.architecture, info.device, info.description].filter(Boolean).join(' / ') || 'unknown';
+      } catch { /* diagnostic only */ }
+
       const scene = new Scene();
       scene.background = new Color(0xa9bfa8);
       scene.fog = new Fog(0xa9bfa8, 70, 280);
-      scene.add(new HemisphereLight(0xdfffe0, 0x3a3020, 1.4));
+      scene.add(new HemisphereLight(0xdfffe0, 0x3a3020, 1.1));
       const sun = new DirectionalLight(0xfff0c8, 3);
-      sun.position.set(40, 70, 30);
-      scene.add(sun);
+      const SUN_DIR = new Vector3(40, 70, 30);
+      if (shadows) {
+        sun.castShadow = true;
+        sun.shadow.mapSize.set(2048, 2048);
+        const c = sun.shadow.camera;
+        c.left = -60; c.right = 60; c.top = 60; c.bottom = -60; c.near = 1; c.far = 260;
+        sun.shadow.bias = -0.0004;
+        sun.shadow.normalBias = 0.05;
+      }
+      scene.add(sun, sun.target);
       const terrain = createTerrain();
       const veg = createVegetation(tier);
       scene.add(terrain.group, veg.group);
@@ -42,16 +61,71 @@
       };
       window.addEventListener('resize', resize);
       resize();
-      const view = q.get('view') ?? 'valley';
-      const tgt = new Vector3();
-      if (view === 'intro') { sampleIntro(Number(q.get('u') ?? 0.3), camera.position, tgt); camera.lookAt(tgt); }
-      else if (view === 'reveal') { sampleIntro(1, camera.position, tgt); camera.lookAt(tgt); }
-      else { camera.position.set(-30, 14, 30); camera.lookAt(6, 4, -40); }
 
-      window.__dev = { tier, counts: veg.counts, expected: vegetationCounts(tier), budget: BUDGETS[tier], placements: veg.placements, terrainHeight, inClearing, meshes: veg.meshes, camera };
-      const draw = () => renderer.render(scene, camera);
-      if (!q.has('manual')) startLoop(draw);
-      else draw();
+      // Close views are anchored on a real conifer so they always show trunk, understory and ground.
+      const clearConifers = veg.placements.conifer.filter((p) => Math.hypot(p.x - 0, p.z + 35) < 48 && Math.hypot(p.x - 0, p.z + 35) > 30);
+      const anchor = clearConifers[Math.floor(clearConifers.length / 3)] ?? veg.placements.conifer[0];
+      const tgt = new Vector3();
+      const setView = (view, u) => {
+        if (view === 'intro') { sampleIntro(u, camera.position, tgt); camera.lookAt(tgt); }
+        else if (view === 'reveal') { sampleIntro(1, camera.position, tgt); camera.lookAt(tgt); }
+        else if (view === 'close') {
+          const dx = 6 - anchor.x, dz = -35 - anchor.z, l = Math.hypot(dx, dz);
+          camera.position.set(anchor.x + (dx / l) * 6, anchor.y + 1.7, anchor.z + (dz / l) * 6);
+          camera.lookAt(anchor.x, anchor.y + 4, anchor.z);
+        } else if (view === 'ground') {
+          const dx = 6 - anchor.x, dz = -35 - anchor.z, l = Math.hypot(dx, dz);
+          camera.position.set(anchor.x + (dx / l) * 9, anchor.y + 2.4, anchor.z + (dz / l) * 9);
+          camera.lookAt(anchor.x + (dx / l) * 2, anchor.y - 0.3, anchor.z + (dz / l) * 2);
+        } else if (view === 'shadow') {
+          camera.position.set(-22, 9, 14);
+          camera.lookAt(-6, 2, -22);
+        } else { camera.position.set(-30, 14, 30); camera.lookAt(6, 4, -40); }
+      };
+      const view = q.get('view') ?? 'valley';
+      setView(view, Number(q.get('u') ?? 0.3));
+
+      // Shadow camera follows the view, snapped to shadow texels so shadows do not shimmer while moving.
+      const fwd = new Vector3();
+      const follow = () => {
+        if (!shadows) { sun.position.copy(SUN_DIR); return; }
+        camera.getWorldDirection(fwd);
+        const texel = 120 / 2048;
+        sun.target.position.set(
+          Math.round((camera.position.x + fwd.x * 40) / texel) * texel, 0,
+          Math.round((camera.position.z + fwd.z * 40) / texel) * texel,
+        );
+        sun.position.copy(sun.target.position).add(SUN_DIR);
+        sun.target.updateMatrixWorld();
+      };
+
+      // Frame-time recording (raw rAF interval, like the spike page).
+      const MAX = 32768;
+      const frames = new Float64Array(MAX);
+      let count = 0, recording = false, last = performance.now(), elapsed = 0;
+      const play = q.get('play') ?? 'still';
+      const frame = (dt) => {
+        const now = performance.now();
+        if (recording && count < MAX) frames[count++] = now - last;
+        last = now;
+        elapsed += dt;
+        if (play === 'intro') setView('intro', Math.min(1, elapsed / INTRO_DURATION));
+        else if (play === 'loop') setView('intro', (elapsed % INTRO_DURATION) / INTRO_DURATION);
+        follow();
+        renderer.render(scene, camera);
+      };
+      window.__spike = {
+        ready: true,
+        config: { tier, shadows, counts: veg.counts, play },
+        trexLoaded: false,
+        backend: isWebGPU ? 'webgpu' : 'webgl2',
+        adapter,
+        begin() { count = 0; last = performance.now(); recording = true; },
+        end() { recording = false; return Array.from(frames.subarray(0, count)); },
+      };
+      window.__dev = { tier, counts: veg.counts, budget: BUDGETS[tier], placements: veg.placements, terrainHeight, inClearing, riverX, meshes: veg.meshes, camera, anchor };
+      if (!q.has('manual')) startLoop(frame);
+      else frame(0);
       document.documentElement.dataset.ready = '1';
     </script>
   </body>
