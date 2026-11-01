@@ -124,16 +124,24 @@ def still(sc, cam, path, loc, target, lens):
     bpy.ops.render.render(write_still=True)
 
 
-def clip(sc, cam, arm, name, out_dir, prefix, top=False, fps=24):
+def clip(sc, cam, arm, name, out_dir, prefix, top=False, fps=24, feet=False):
     clip_name = "walk" if name.startswith("walk") else name
     seconds = 4 * WALK_T if clip_name == "walk" else 8.0        # whole cycles so the video loops
     sc.render.fps = fps
     bars, spacing = build_ground()
+    if feet:                                      # short floor marks: at a 4 degree camera a long bar would look like a post
+        for c in bars.children:
+            c.scale.x = 0.2
     build_reference_line(1.8)
     cam.data.type = "ORTHO"
     sc.render.resolution_x, sc.render.resolution_y = 1200, 600
     cam.data.ortho_scale = 6.6                    # 4.5 m animal + margin: head and whole tail stay in frame
-    if top:
+    if feet:                                      # low camera (4 degrees), legs only: floor marks are flat lines, no posts
+        cam.data.ortho_scale = 2.0
+        e = math.radians(4)
+        aim(cam, (-30 * math.cos(e), -0.1, 0.45 + 30 * math.sin(e)), (0, -0.1, 0.45))
+        sc.render.resolution_x, sc.render.resolution_y = 1200, 600
+    elif top:
         cam.location = (0, 0.55, 30)
         cam.rotation_euler = (0, 0, math.radians(-90))   # image right = -Y (the animal faces right)
     else:
@@ -175,6 +183,13 @@ def main():
     if "feet" in what:
         F = Vector((0.0, -0.05, 0.4))
         still(sc, cam, os.path.join(out_dir, f"{prefix}-closeup-feet.png"), F + Vector((-0.8, -0.5, 0.1)).normalized() * 1.0, F, 40)
+    if "belly" in what:
+        bpy.ops.mesh.primitive_plane_add(size=60, location=(0, 0, 0))
+        bpy.context.active_object.data.materials.append(mat((0.34, 0.34, 0.34, 1)))
+        still(sc, cam, os.path.join(out_dir, f"{prefix}-closeup-belly.png"), Vector((0, -0.1, 0.05)), Vector((0, -0.1, 1.05)), 35)
+        still(sc, cam, os.path.join(out_dir, f"{prefix}-closeup-inner-thigh.png"), Vector((1.0, -0.1, 0.7)), Vector((0.2, -0.1, 0.75)), 40)
+        still(sc, cam, os.path.join(out_dir, f"{prefix}-closeup-brow.png"), Vector((-0.5, -1.9, 2.1)), Vector((0, -1.3, 1.95)), 50)
+        still(sc, cam, os.path.join(out_dir, f"{prefix}-closeup-shin.png"), Vector((0, -1.0, 0.35)), Vector((0.34, -0.05, 0.35)), 50)
     if "digits" in what:
         bpy.ops.mesh.primitive_plane_add(size=60, location=(0, 0, 0))
         bpy.context.active_object.data.materials.append(mat((0.34, 0.34, 0.34, 1)))
@@ -182,11 +197,11 @@ def main():
                                    ("hands-front", (0, -1.05, 0.62), (0, -1.0, 0.2), 50), ("hand-side", (0.28, -1.03, 0.6), (1.0, -0.1, 0.1), 60)):
             T = Vector(tgt)
             still(sc, cam, os.path.join(out_dir, f"{prefix}-digits-{nm}.png"), T + Vector(off).normalized() * 1.0, T, lens)
-    for name in [w for w in what if w in ("idle", "walk", "walk-top")]:
+    for name in [w for w in what if w in ("idle", "walk", "walk-top", "walk-feet")]:
         for o in list(bpy.data.objects):
             if o.name.startswith(("Cube", "Plane", "bars")):
                 bpy.data.objects.remove(o)
-        clip(sc, cam, arm, name, out_dir, prefix, top=name == "walk-top")
+        clip(sc, cam, arm, name, out_dir, prefix, top=name == "walk-top", feet=name == "walk-feet")
 
 
 main()

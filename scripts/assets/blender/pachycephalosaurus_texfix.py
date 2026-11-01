@@ -47,7 +47,21 @@ def w_thigh(p, n):
 def w_shin(p, n):
     if not (0.05 < p[2] < 0.75) or abs(p[0]) < 0.12:
         return 0.0
-    return float(sstep(p[2], 0.30, 0.38) * (1 - sstep(p[2], 0.55, 0.70)) * sstep(p[1], -0.35, -0.2) * (1 - sstep(p[1], 0.30, 0.45)))
+    return float(sstep(p[2], 0.20, 0.28) * (1 - sstep(p[2], 0.55, 0.70)) * sstep(p[1], -0.35, -0.2) * (1 - sstep(p[1], 0.50, 0.65)))
+
+
+def w_meta(p, n):
+    # pale metatarsus patch of the source (sharp-edged light band): ankle to ball of the foot, behind the toes
+    if abs(p[0]) < 0.2 or not (0.10 < p[2] < 0.50) or p[1] < -0.10:
+        return 0.0
+    return float(sstep(p[2], 0.10, 0.16) * (1 - sstep(p[2], 0.42, 0.50)) * sstep(p[1], -0.10, -0.05))
+
+
+def w_ref(p, n):
+    # reference area (not edited): the dark scaly shin directly above the pale metatarsus patch
+    if abs(p[0]) < 0.2 or not (0.50 < p[2] < 0.62) or not (-0.1 < p[1] < 0.25):
+        return 0.0
+    return 1.0
 
 
 EYES = []   # filled from the two small islands
@@ -63,6 +77,7 @@ def w_brow(p, n):
     return float(1 - sstep(d, 0.07, 0.12)) * float(sstep(n[2], -0.1, 0.3))
 
 
+RMEAN = {}
 RECTS = {"belly": (800, 1388, 886, 1489)}
 
 REGIONS = [
@@ -70,6 +85,8 @@ REGIONS = [
     ("belly", w_belly, (0.26, 0.05, 1.0), 0.07, None),
     ("thigh", w_thigh, (0.40, -0.05, 0.9), 0.07, None),
     ("shin", w_shin, (0.40, -0.05, 0.78), 0.09, None),
+    ("ref", w_ref, (0.40, -0.05, 0.9), 0.07, "ref-only"),
+    ("meta", w_meta, (0.40, -0.05, 0.9), 0.07, "all-notone"),
     ("brow", w_brow, (0.12, -1.25, 1.75), 0.06, "pale"),
 ]
 
@@ -185,7 +202,7 @@ def main():
         size = hi - lo
         print(name, "donor uv px", lo, hi, "density px/m", dens, "faces", nf)
         # donor patch (shrink 2px from the edges so island borders do not bleed in)
-        lo = lo + 2; hi = hi - 2; size = hi - lo
+        lo = lo + 5; hi = hi - 5; size = hi - lo
         ys, xs = int(lo[1]), int(lo[0])
         dcol = bc0[ys:int(hi[1]), xs:int(hi[0]), :3]
         dmean = dcol.reshape(-1, 3).mean(0)
@@ -206,6 +223,8 @@ def main():
         print(name, "triangles", len(regions_tri))
         tone_acc = []
         for pass_ in (0, 1):
+            if pass_ == 1 and cond == "ref-only":
+                break
             for poly, ww in regions_tri:
                 i0, i1, i2 = poly.vertices
                 P = np.array([verts[i0], verts[i1], verts[i2]], dtype=np.float64)
@@ -251,11 +270,12 @@ def main():
                 wa = (tent(fu) * tent(fv))[:, None]               # cross-fade the two tilings so no tile edge shows
                 dcolx = (bc0[dyA, dxA, :3] * wa + bc0[dyB, dxB, :3] * (1 - wa)) * tone
                 al = wt.copy()
-                if cond == "pale":
+                if cond in ("pale", "pale-notone"):
                     lum = orig @ np.array([0.3, 0.55, 0.15])
-                    al *= sstep(lum, 0.22, 0.34)
+                    al *= sstep(lum, 0.22, 0.34) if cond == "pale" else sstep(lum, 0.46, 0.54)
                 al = np.clip(al, 0, 1)[:, None]
-                bc[ty, tx, :3] = orig * (1 - al) + np.clip(dcolx, 0, 1) * al
+                cur = bc[ty, tx, :3]              # mix over the current result so regions that overlap do not undo each other
+                bc[ty, tx, :3] = cur * (1 - al) + np.clip(dcolx, 0, 1) * al
                 # normal: donor tangent-space normal expressed in the target tangent frame
                 dn = (nm0[dyA, dxA, :3] * 2 - 1) * wa + (nm0[dyB, dxB, :3] * 2 - 1) * (1 - wa)
                 dn /= np.linalg.norm(dn, axis=1, keepdims=True) + 1e-9
@@ -278,7 +298,7 @@ def main():
                 Tn -= Nv * (Tn * Nv).sum(1, keepdims=True); Tn /= np.linalg.norm(Tn, axis=1, keepdims=True) + 1e-9
                 Bn -= Nv * (Bn * Nv).sum(1, keepdims=True) + Tn * (Bn * Tn).sum(1, keepdims=True); Bn /= np.linalg.norm(Bn, axis=1, keepdims=True) + 1e-9
                 tn = np.stack([(Nw * Tn).sum(1), (Nw * Bn).sum(1), (Nw * Nv).sum(1)], 1)
-                o = nm0[ty, tx, :3] * 2 - 1
+                o = nm[ty, tx, :3] * 2 - 1
                 mix = o * (1 - al) + tn * al
                 mix /= np.linalg.norm(mix, axis=1, keepdims=True) + 1e-9
                 nm[ty, tx, :3] = mix * 0.5 + 0.5
@@ -286,6 +306,13 @@ def main():
                 allc = np.concatenate(tone_acc) if tone_acc else np.zeros((1, 3))
                 rmean = allc.mean(0) if len(allc) else dmean
                 tone = np.clip(rmean / np.maximum(dmean, 1e-3), 0.7, 1.4)
+                RMEAN[name] = rmean
+                if cond == "pale-notone":
+                    tone = np.ones(3)
+                if cond == "all-notone":           # donor is the dark mottled thigh skin that continues above the patch
+                    # darken the donor to the luminance of the dark skin that surrounds the pale patch (measured 0.27-0.33)
+                    lum_d = float(dmean @ np.array([0.3, 0.55, 0.15]))
+                    tone = np.full(3, float(np.clip(0.30 / max(lum_d, 1e-3), 0.4, 1.0)))
                 print(name, "tone", tone)
     base.pixels.foreach_set(bc.ravel()); base.pack()
     nrm.pixels.foreach_set(nm.ravel()); nrm.pack()
