@@ -23,9 +23,18 @@
     "sourceUrl": "https://sketchfab.com/3d-models/triceratops-dinosaur-87527079bad44917ab1b98a456b46c7e",
     "author": "wojciechmiedziocha",
     "license": "CC-BY-4.0",
-    "modifications": [],
-    "files": { "high": "assets/src/triceratops/high.glb", "low": "assets/src/triceratops/low.glb" },
-    "clips": {},
+    "modifications": [
+      "Converted the source OBJ (Y-up to Z-up) and uniformly scaled it to an 8 m nose-to-tail animal (about 3.2 m at the frill); feet placed on z=0, -Y forward (scripts/assets/blender/triceratops_prep.py)",
+      "Subdivided the 12,560-triangle sculpt once (Catmull-Clark, UVs kept, smooth shading) to 50,472 triangles so horn bases, eye socket and beak do not facet at 1 m; surface detail stays in the baked normal map",
+      "Rebuilt the PBR material from the source maps: base colour + normal resized 4096->2048, roughness (source roughness map) packed into a 1024 px ORM texture (baked AO in R is carried but unused by the glTF material); specular, metallic and internal ground-AO maps dropped",
+      "Authored a 29-bone deform armature (spine, neck, head, jaw, 6 tail bones, 2 hind legs x thigh/shin/foot/toes, 2 forelimbs x upper/lower/hand/fingers) because the source is static; skinned with Blender automatic weights (scripts/assets/blender/triceratops_rig.py)",
+      "Beak/lower jaw re-weighted by a mouth-line plane and relaxed over the surface (4 smoothing passes) so the beak can chew without tearing the lip; weights limited to 4 influences per vertex and normalised",
+      "Authored clips idle (4.0 s), walk (2.2 s, four-beat lateral sequence, 0.78 m/s, toe tips planted via analytic 2-bone IK, body bob and roll, tail counter-swing) and eat (5.0 s, head lowered to the ground, three beak chomps) procedurally; every clip loops (last frame = first) (scripts/assets/blender/triceratops_anim.py)",
+      "Anatomy check at 1 m: three facial horns (brow pair + nose), solid frill with no holes, forelimbs held under the body (not sprawled), hind knees forward; no rest-pose change needed",
+      "Optimized with scripts/assets/optimize.mjs: high = full mesh, 2048 px KTX2; low = 35 % triangles, 1024 px KTX2; meshopt"
+    ],
+    "files": { "high": "public/models/triceratops.high.glb", "low": "public/models/triceratops.low.glb" },
+    "clips": { "idle": "idle", "walk": "walk", "eat": "eat" },
     "status": "candidate"
   },
   {
