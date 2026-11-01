@@ -267,6 +267,7 @@ async function main() {
   let count = 0;
   let recording = false;
   let elapsed = 0;
+  let lastNow = performance.now();
 
   camera.position.set(16, 3.2, 0);
   camera.lookAt(0, 2.2, 0);
@@ -274,7 +275,10 @@ async function main() {
 
   startLoop((dt) => {
     elapsed += dt;
-    if (recording && count < MAX_FRAMES) frames[count++] = dt * 1000;
+    // Raw interval: startLoop clamps dt to 100 ms, which would hide long hitches (rubric P3).
+    const now = performance.now();
+    if (recording && count < MAX_FRAMES) frames[count++] = now - lastNow;
+    lastNow = now;
     // Slow deterministic orbit so the measured frames include view changes.
     const a = elapsed * 0.08;
     camera.position.set(Math.cos(a) * 16, 3.2, Math.sin(a) * 16);
@@ -289,7 +293,7 @@ async function main() {
     trexLoaded: trex !== null,
     backend: isWebGPU ? 'webgpu' : 'webgl2',
     adapter,
-    begin() { count = 0; recording = true; },
+    begin() { count = 0; lastNow = performance.now(); recording = true; },
     end() { recording = false; return Array.from(frames.subarray(0, count)); },
   };
   document.documentElement.dataset.ready = '1';

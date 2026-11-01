@@ -18,6 +18,9 @@ const TIERS = ['high', 'medium', 'low'] as const;
 // Budget gates from ADR 0006: desktop high holds 60 fps; phone medium p95 <= 33 ms.
 const GATES: Record<string, number> = { 'desktop/high': 1000 / 60, 'phone/medium': 1000 / 30 };
 
+// An empty scene on any hardware GPU renders far faster than this; above it, other load is distorting the run.
+const CONTROL_MAX_MS = 4;
+
 const PROFILES = {
   desktop: { viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 1, isMobile: false, cpuThrottle: 1 },
   phone: { viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, cpuThrottle: 4 },
@@ -35,6 +38,7 @@ interface Result {
   p99Ms: number;
   maxMs: number;
   meanFps: number;
+  errors: string[];
 }
 
 const results: Result[] = [];
@@ -61,14 +65,14 @@ test.use({
 test.describe.configure({ mode: 'serial' });
 test.setTimeout(120_000);
 
-async function measure(browser: Browser, profile: keyof typeof PROFILES, tier: string): Promise<Result> {
+async function measure(browser: Browser, profile: keyof typeof PROFILES, tier: string, extra = EXTRA, seconds = SECONDS): Promise<Result> {
   const p = PROFILES[profile];
   const context = await browser.newContext({ viewport: p.viewport, deviceScaleFactor: p.deviceScaleFactor, isMobile: p.isMobile, hasTouch: p.isMobile });
   const page = await context.newPage();
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(String(e)));
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
-  const query = `tier=${tier}${EXTRA ? `&${EXTRA}` : ''}`;
+  const query = `tier=${tier}${extra ? `&${extra}` : ''}`;
   await page.goto(`/dinosaur/dev/spike.html?${query}`);
   await page.waitForSelector('html[data-ready="1"]', { timeout: 60_000 });
   if (p.cpuThrottle > 1) {
@@ -83,18 +87,23 @@ async function measure(browser: Browser, profile: keyof typeof PROFILES, tier: s
   meta.adapter = info.adapter;
   await page.waitForTimeout(2000);
   await page.evaluate(() => window.__spike!.begin());
-  await page.waitForTimeout(SECONDS * 1000);
+  await page.waitForTimeout(seconds * 1000);
   const frames = await page.evaluate(() => window.__spike!.end());
   await context.close();
-  expect(errors).toEqual([]);
   const sorted = [...frames].sort((a, b) => a - b);
   const total = frames.reduce((a, b) => a + b, 0);
   return {
     profile, tier, query, config: info.config, trexLoaded: info.trexLoaded, frames: frames.length,
     medianMs: round(quantile(sorted, 0.5)), p95Ms: round(quantile(sorted, 0.95)), p99Ms: round(quantile(sorted, 0.99)),
-    maxMs: round(sorted[sorted.length - 1] ?? NaN), meanFps: round((frames.length * 1000) / total),
+    maxMs: round(sorted[sorted.length - 1] ?? NaN), meanFps: round((frames.length * 1000) / total), errors,
   };
 }
+
+// Empty-scene control: a high value means other load on the machine, so the run is not trustworthy.
+test('control empty scene frame time', async ({ browser }) => {
+  const r = await measure(browser, 'desktop', 'high', 'ferns=0&particles=0&trex=0', 4);
+  meta.control = { medianMs: r.medianMs, p95Ms: r.p95Ms, maxMs: r.maxMs, maxAllowedP95Ms: CONTROL_MAX_MS, note: 'desktop, empty scene; ~1.8 ms p95 on the idle reference iGPU' };
+});
 
 for (const profile of Object.keys(PROFILES) as (keyof typeof PROFILES)[]) {
   for (const tier of TIERS) {
@@ -102,16 +111,27 @@ for (const profile of Object.keys(PROFILES) as (keyof typeof PROFILES)[]) {
       const r = await measure(browser, profile, tier);
       results.push(r);
       test.info().annotations.push({ type: 'perf', description: `${profile}/${tier}: median ${r.medianMs} ms, p95 ${r.p95Ms} ms (${r.frames} frames)` });
-      const gate = GATES[`${profile}/${tier}`];
-      if (gate === undefined) return;
-      // Software adapters (CI without a GPU) cannot judge smoothness; report but do not gate.
-      const software = meta.backend !== 'webgpu' || /swiftshader|llvmpipe|software/i.test(String(meta.adapter));
-      test.skip(software, `no hardware WebGPU adapter (${meta.backend}, ${meta.adapter}); perf gate not applicable`);
-      expect(r.frames, 'frames recorded').toBeGreaterThan(SECONDS * 20);
-      expect(r.p95Ms, `${profile}/${tier} p95 frame time (ms)`).toBeLessThanOrEqual(gate);
     });
   }
 }
+
+// Gates run last so every scenario is measured and written even when one is over budget.
+test('budget gates (ADR 0006, ADR 0010)', async () => {
+  test.skip(results.length === 0, 'no scenarios measured (filtered by --grep)');
+  for (const r of results) expect.soft(r.errors, `${r.profile}/${r.tier} console errors`).toEqual([]);
+  // Software adapters (CI without a GPU) cannot judge smoothness; report but do not gate.
+  const software = meta.backend !== 'webgpu' || /swiftshader|llvmpipe|software/i.test(String(meta.adapter));
+  test.skip(software, `no hardware WebGPU adapter (${meta.backend}, ${meta.adapter}); perf gate not applicable`);
+  const control = meta.control as { p95Ms: number } | undefined;
+  if (control) expect(control.p95Ms, 'empty-scene control p95 (ms): the machine is busy, rerun on an idle machine').toBeLessThanOrEqual(CONTROL_MAX_MS);
+  for (const r of results) {
+    const gate = GATES[`${r.profile}/${r.tier}`];
+    if (gate === undefined) continue;
+    expect.soft(r.frames, `${r.profile}/${r.tier} frames recorded`).toBeGreaterThan(SECONDS * 20);
+    expect.soft(r.p95Ms, `${r.profile}/${r.tier} p95 frame time (ms)`).toBeLessThanOrEqual(gate);
+    expect.soft(r.maxMs, `${r.profile}/${r.tier} longest frame (ms), rubric P3`).toBeLessThan(100);
+  }
+});
 
 test.afterAll(async ({ browserName }, info) => {
   if (!results.length) return;
