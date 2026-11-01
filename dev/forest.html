@@ -103,12 +103,14 @@
       const MAX = 32768;
       const frames = new Float64Array(MAX);
       let count = 0, recording = false, last = performance.now(), elapsed = 0;
+      let t0 = null;
       const play = q.get('play') ?? 'still';
       const frame = (dt) => {
         const now = performance.now();
         if (recording && count < MAX) frames[count++] = now - last;
         last = now;
-        elapsed += dt;
+        if (t0 === null) t0 = now;
+        elapsed = (now - t0) / 1000; // wall clock: the camera path must not slow down when frames are slow
         if (play === 'intro') setView('intro', Math.min(1, elapsed / INTRO_DURATION));
         else if (play === 'loop') setView('intro', (elapsed % INTRO_DURATION) / INTRO_DURATION);
         follow();

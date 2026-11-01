@@ -6,7 +6,7 @@ All Hell Creek flora is **procedural** (generated in `src/world/vegetation.ts`);
 |---|---|---|---|
 | Fern | ferns | Hell Creek understory ferns (e.g. Gleicheniaceae/Osmundaceae types) | 8 arching pinnate fronds, alpha-cut leaflets |
 | Cycad | cycads | Stout-trunked cycadeoid rosette | short trunk + 13 stiff fronds |
-| Conifer | conifers | *Metasequoia*-like deciduous conifer | straight trunk, 9-tier conical crown, up to ~26 m |
+| Conifer | conifers | *Metasequoia*/*Taxodium*-like deciduous conifer | fluted, buttressed reddish trunk; open crown of ~72 drooping feathery branch sprays (alpha-cut pinnae), ~26 m; per-instance scale, lean and tint |
 | Shrub | early angiosperms | Magnoliid-like broad-leaved shrub | thin stems with ovate leaves, no flowers |
 
-No grass, no palms, no flowers. Counts: `BUDGETS[tier]` (ADR 0010); shrubs are 10 % of the fern budget.
+No grass, no palms, no flowers. Counts: `BUDGETS[tier]` (ADR 0010): ferns, cycads, conifers and shrubs.
