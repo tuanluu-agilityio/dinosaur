@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Atmosphere dev page</title>
+    <style>
+      html, body { margin: 0; height: 100%; background: #0b0f0c; overflow: hidden; }
+      canvas { display: block; width: 100%; height: 100%; }
+      #dev-overlay { position: fixed; top: 8px; left: 8px; padding: 4px 8px; font: 12px monospace; color: #cfe; background: rgba(0,0,0,.6); }
+      #dev-overlay button { margin-left: 4px; }
+    </style>
+  </head>
+  <body>
+    <canvas id="scene"></canvas>
+    <div id="dev-overlay" hidden><span id="label"></span>
+      <button data-tier="high">high</button><button data-tier="medium">medium</button><button data-tier="low">low</button></div>
+    <!--
+      P3-T02 dev page. Params: tier=low|medium|high, webgl=1 (force the WebGL2 backend),
+      particles=N, godrays=0|1, shadows=0|1, fog=0 (overrides for perf layering), trunks=0 (empty scene),
+      angle=<rad> + still=1 (fixed camera for screenshots).
+      window.__atmo: stats(), setTier(t), begin()/end() frame-time recording (same method as perf.spec.ts).
+    -->
+    <script type="module">
+      import {
+        Scene, PerspectiveCamera, Mesh, PlaneGeometry, CylinderGeometry, SphereGeometry, InstancedMesh,
+        MeshStandardMaterial, Object3D, WebGPURenderer, ACESFilmicToneMapping,
+      } from 'three/webgpu';
+      import { createRenderer } from '/src/core/renderer.ts';
+      import { Atmosphere } from '/src/world/atmosphere.ts';
+
+      const q = new URLSearchParams(location.search);
+      const t = q.get('tier');
+      const tier = t === 'low' || t === 'medium' || t === 'high' ? t : 'high';
+      const num = (k) => (q.has(k) && Number.isFinite(Number(q.get(k))) ? Math.max(0, Math.floor(Number(q.get(k)))) : undefined);
+      const flag = (k) => (q.has(k) ? q.get(k) !== '0' : undefined);
+
+      const canvas = document.getElementById('scene');
+      let renderer, isWebGPU;
+      if (q.get('webgl') === '1') {
+        renderer = new WebGPURenderer({ canvas, antialias: true, forceWebGL: true });
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        await renderer.init();
+        isWebGPU = false;
+      } else {
+        ({ renderer, isWebGPU } = await createRenderer(canvas));
+      }
+      renderer.toneMapping = ACESFilmicToneMapping;
+
+      let adapter = 'unknown';
+      try {
+        const info = (await navigator.gpu?.requestAdapter())?.info;
+        if (info) adapter = [info.vendor, info.architecture, info.device, info.description].filter(Boolean).join(' / ') || 'unknown';
+      } catch { /* diagnostic only */ }
+
+      const scene = new Scene();
+      const camera = new PerspectiveCamera(50, 1, 0.1, 250);
+
+      const atmo = new Atmosphere(scene, renderer, {
+        tier, isWebGPU,
+        overrides: { particles: num('particles'), godrays: flag('godrays'), shadows: flag('shadows'), fog: flag('fog') },
+      });
+
+      // Stand-in forest: leaf-litter ground, conifer-like trunks and a broken canopy layer.
+      if (q.get('trunks') !== '0') {
+        const ground = new Mesh(new PlaneGeometry(500, 500), new MeshStandardMaterial({ color: 0x3a2f20, roughness: 1 }));
+        ground.rotation.x = -Math.PI / 2;
+        ground.receiveShadow = true;
+        scene.add(ground);
+        const rnd = (i) => { const x = Math.sin(i * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
+        const N = 90, dummy = new Object3D();
+        const trunks = new InstancedMesh(new CylinderGeometry(0.35, 0.6, 1, 8), new MeshStandardMaterial({ color: 0x4a3a2a, roughness: 0.95 }), N);
+        const crowns = new InstancedMesh(new SphereGeometry(1, 12, 8), new MeshStandardMaterial({ color: 0x2c4a22, roughness: 0.9 }), N);
+        for (let i = 0; i < N; i++) {
+          const r = 6 + rnd(i) * 70, a = rnd(i + 0.5) * Math.PI * 2, h = 14 + rnd(i + 0.25) * 10;
+          dummy.position.set(Math.cos(a) * r, h / 2, Math.sin(a) * r); dummy.scale.set(1, h, 1); dummy.rotation.set(0, 0, 0);
+          dummy.updateMatrix(); trunks.setMatrixAt(i, dummy.matrix);
+          dummy.position.y = h + 1; dummy.scale.set(4 + rnd(i + 0.7) * 3, 2.2, 4 + rnd(i + 0.9) * 3);
+          dummy.updateMatrix(); crowns.setMatrixAt(i, dummy.matrix);
+        }
+        for (const m of [trunks, crowns]) { m.castShadow = true; m.receiveShadow = true; scene.add(m); }
+      }
+
+      const resize = () => {
+        renderer.setSize(window.innerWidth, window.innerHeight, false);
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+      };
+      window.addEventListener('resize', resize);
+      resize();
+
+      const label = document.getElementById('label');
+      const overlay = document.getElementById('dev-overlay');
+      overlay.hidden = false;
+      const showLabel = () => {
+        const s = atmo.stats();
+        label.textContent = `tier: ${s.tier} | particles ${s.particlesDrawn} | godrays ${s.godrays ? 'on' : 'off'} | shadows ${s.shadows ? 'on' : 'off'} | fog ${s.fog ? 'on' : 'off'} | ${isWebGPU ? 'webgpu' : 'webgl2'}`;
+      };
+      const setTier = (tier) => { atmo.setTier(tier); showLabel(); };
+      for (const b of overlay.querySelectorAll('button')) b.addEventListener('click', () => setTier(b.dataset.tier));
+      showLabel();
+
+      // Frame times in a preallocated buffer (no allocation in the loop), as in src/spike/spike.ts.
+      const frames = new Float64Array(32768);
+      let count = 0, recording = false, elapsed = 0, lastNow = performance.now();
+      const still = q.get('still') === '1';
+      const angle0 = Number(q.get('angle') ?? 0.6);
+      const place = (a) => { camera.position.set(Math.cos(a) * 16, 2.2, Math.sin(a) * 16); camera.lookAt(Math.cos(a) * 16 + Math.cos(a + 1.9) * 10, 3.6, Math.sin(a) * 16 + Math.sin(a + 1.9) * 10); };
+      place(angle0);
+      atmo.update(camera);
+      await renderer.compileAsync(scene, camera);
+
+      const api = {
+        ready: true, frame: 0, backend: isWebGPU ? 'webgpu' : 'webgl2', adapter,
+        stats: () => atmo.stats(), setTier,
+        begin() { count = 0; lastNow = performance.now(); recording = true; },
+        end() { recording = false; return Array.from(frames.subarray(0, count)); },
+      };
+      // Own loop instead of startLoop(): startLoop only knows renderers made by createRenderer (not webgl=1).
+      let last = performance.now();
+      renderer.setAnimationLoop(() => {
+        const now = performance.now();
+        const dt = Math.min((now - last) / 1000, 0.1);
+        last = now;
+        if (recording && count < frames.length) frames[count++] = now - lastNow;
+        lastNow = now;
+        elapsed += dt;
+        // Slow orbit that turns the view towards and away from the sun.
+        if (!still) place(angle0 + elapsed * 0.08);
+        atmo.update(camera);
+        renderer.render(scene, camera);
+        api.frame++;
+      });
+      window.__atmo = api;
+      document.documentElement.dataset.ready = '1';
+    </script>
+  </body>
+</html>
