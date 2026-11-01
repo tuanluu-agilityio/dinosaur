@@ -4,7 +4,7 @@ import {
   BufferAttribute, BufferGeometry, Group, Mesh, MeshPhysicalNodeMaterial, MeshStandardNodeMaterial, PlaneGeometry,
 } from 'three/webgpu';
 import {
-  float, mix, mx_noise_float, normalWorld, normalize, positionWorld, smoothstep, time, transformNormalToView, vec3,
+  abs, cross, dFdx, dFdy, dot, float, mix, mx_noise_float, normalView, normalize, positionView, positionWorld, sign, smoothstep, time, transformNormalToView, vec3,
 } from 'three/tsl';
 
 /** Clearing (ellipse) where dinosaurs live; no vegetation is placed inside. */
@@ -86,7 +86,6 @@ export function createTerrain(segments = 200): Terrain {
   const big = n2(0.05);
   const mid = n2(0.35);
   const fine = n2(2.2);
-  const grit = n2(9);
   const litter = vec3(0.17, 0.115, 0.07);
   const silt = vec3(0.3, 0.255, 0.19);
   const moss = vec3(0.09, 0.13, 0.05);
@@ -95,15 +94,15 @@ export function createTerrain(segments = 200): Terrain {
   base = mix(base, moss, smoothstep(0.25, 0.7, mid.mul(0.6).add(big.mul(0.4))).mul(0.45));
   const wet = smoothstep(float(0.3), float(-1.0), wp.y);
   base = mix(base, mud, wet);
-  m.colorNode = base.mul(float(0.8).add(fine.mul(0.22)).add(grit.mul(0.12)));
+  m.colorNode = base.mul(float(0.8).add(fine.mul(0.3)));
   m.roughnessNode = mix(float(0.97).sub(fine.mul(0.08)), float(0.45), wet);
-  // Normal perturbation from finite differences of the fine noise.
-  const e = 0.05;
-  const hh = (ox: number, oz: number) => mx_noise_float(vec3(wp.x.add(ox).mul(2.2), 0, wp.z.add(oz).mul(2.2))).add(mx_noise_float(vec3(wp.x.add(ox).mul(9), 0, wp.z.add(oz).mul(9))).mul(0.3));
-  const h0 = hh(0, 0);
-  const gx = hh(e, 0).sub(h0).div(e);
-  const gz = hh(0, e).sub(h0).div(e);
-  m.normalNode = transformNormalToView(normalize(normalWorld.add(vec3(gx.negate(), 0, gz.negate()).mul(0.045))));
+  // Bump normal from screen-space derivatives of the height-like noise (surface-gradient method): no extra noise evaluations.
+  const h = fine.add(mid.mul(0.6));
+  const sx = dFdx(positionView), sy = dFdy(positionView);
+  const r1 = cross(sy, normalView), r2 = cross(normalView, sx);
+  const det = dot(sx, r1);
+  const grad = sign(det).mul(dFdx(h).mul(r1).add(dFdy(h).mul(r2)));
+  m.normalNode = normalize(abs(det).mul(normalView).sub(grad.mul(0.02)));
 
   const ground = new Mesh(geo, m);
   ground.receiveShadow = true;

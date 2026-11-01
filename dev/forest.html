@@ -12,18 +12,21 @@
   <body>
     <canvas id="scene"></canvas>
     <script type="module">
-      // Params: tier=low|medium|high, view=valley|reveal|intro(&u=0..1)|close|ground|shadow, play=intro|loop|still, manual
-      // (render once), noshadow. window.__spike has the same shape as the spike page so tests/e2e/perf.spec.ts can record it.
+      // Params: tier=low|medium|high, view=valley|reveal|intro(&u=0..1)|close|ground|shadow|sway, play=intro|loop|still,
+      // manual (render only on __dev.renderAt / __dev.setTier), noshadow, and perf-tuning count overrides
+      // ferns= cycads= conifers= shrubs=. window.__spike has the same shape as the spike page so
+      // tests/e2e/perf.spec.ts can record frame times.
       import { Scene, PerspectiveCamera, Fog, Color, HemisphereLight, DirectionalLight, Vector3 } from 'three/webgpu';
       import { createRenderer, startLoop } from '/src/core/renderer.ts';
       import { BUDGETS } from '/src/core/budgets.ts';
       import { createTerrain, terrainHeight, inClearing, riverX } from '/src/world/terrain.ts';
-      import { createVegetation } from '/src/world/vegetation.ts';
+      import { createVegetation, SHADOW_LAYER } from '/src/world/vegetation.ts';
       import { sampleIntro, INTRO_DURATION } from '/src/camera/paths.ts';
 
       const q = new URLSearchParams(location.search);
-      const tier = ['low', 'medium', 'high'].includes(q.get('tier')) ? q.get('tier') : 'high';
-      const shadows = BUDGETS[tier].shadows && !q.has('noshadow');
+      const pickTier = (t) => (['low', 'medium', 'high'].includes(t) ? t : 'high');
+      let tier = pickTier(q.get('tier'));
+      let shadows = BUDGETS[tier].shadows && !q.has('noshadow');
       const canvas = document.getElementById('scene');
       const { renderer, isWebGPU } = await createRenderer(canvas);
       renderer.shadowMap.enabled = shadows;
@@ -40,18 +43,27 @@
       scene.add(new HemisphereLight(0xdfffe0, 0x3a3020, 1.1));
       const sun = new DirectionalLight(0xfff0c8, 3);
       const SUN_DIR = new Vector3(40, 70, 30);
-      if (shadows) {
-        sun.castShadow = true;
-        sun.shadow.mapSize.set(2048, 2048);
+      sun.castShadow = shadows;
+      sun.shadow.mapSize.set(2048, 2048);
+      {
         const c = sun.shadow.camera;
         c.left = -60; c.right = 60; c.top = 60; c.bottom = -60; c.near = 1; c.far = 260;
+        c.layers.enable(SHADOW_LAYER); // conifer shadow proxies live on this layer
         sun.shadow.bias = -0.0004;
         sun.shadow.normalBias = 0.05;
       }
       scene.add(sun, sun.target);
       const terrain = createTerrain();
-      const veg = createVegetation(tier);
-      scene.add(terrain.group, veg.group);
+      scene.add(terrain.group);
+
+      // Count overrides are for perf tuning only; budgets live in BUDGETS.
+      const makeVeg = (t) => {
+        const base = BUDGETS[t];
+        const num = (k, d) => (q.has(k) ? Math.max(0, Number(q.get(k))) : d);
+        return createVegetation(t, undefined, { fern: num('ferns', base.ferns), cycad: num('cycads', base.cycads), conifer: num('conifers', base.conifers), shrub: num('shrubs', base.shrubs) });
+      };
+      let veg = makeVeg(tier);
+      scene.add(veg.group);
 
       const camera = new PerspectiveCamera(50, 1, 0.1, 500);
       const resize = () => {
@@ -67,16 +79,18 @@
       const anchor = clearConifers[Math.floor(clearConifers.length / 3)] ?? veg.placements.conifer[0];
       const tgt = new Vector3();
       const setView = (view, u) => {
+        const dx = 6 - anchor.x, dz = -35 - anchor.z, l = Math.hypot(dx, dz);
         if (view === 'intro') { sampleIntro(u, camera.position, tgt); camera.lookAt(tgt); }
         else if (view === 'reveal') { sampleIntro(1, camera.position, tgt); camera.lookAt(tgt); }
         else if (view === 'close') {
-          const dx = 6 - anchor.x, dz = -35 - anchor.z, l = Math.hypot(dx, dz);
           camera.position.set(anchor.x + (dx / l) * 6, anchor.y + 1.7, anchor.z + (dz / l) * 6);
           camera.lookAt(anchor.x, anchor.y + 4, anchor.z);
         } else if (view === 'ground') {
-          const dx = 6 - anchor.x, dz = -35 - anchor.z, l = Math.hypot(dx, dz);
           camera.position.set(anchor.x + (dx / l) * 9, anchor.y + 2.4, anchor.z + (dz / l) * 9);
           camera.lookAt(anchor.x + (dx / l) * 2, anchor.y - 0.3, anchor.z + (dz / l) * 2);
+        } else if (view === 'sway') { // tree tops above, fern fronds below, for wind evidence
+          camera.position.set(anchor.x + (dx / l) * 15, anchor.y + 1.2, anchor.z + (dz / l) * 15);
+          camera.lookAt(anchor.x, anchor.y + 13, anchor.z);
         } else if (view === 'shadow') {
           camera.position.set(-22, 9, 14);
           camera.lookAt(-6, 2, -22);
@@ -99,13 +113,19 @@
         sun.target.updateMatrixWorld();
       };
 
+      // Compile every pipeline (vegetation, terrain, shadow) before the first shown frame so the intro has no
+      // first-use hitches (rubric P3).
+      follow();
+      await renderer.compileAsync(scene, camera);
+      renderer.render(scene, camera);
+
       // Frame-time recording (raw rAF interval, like the spike page).
       const MAX = 32768;
       const frames = new Float64Array(MAX);
       let count = 0, recording = false, last = performance.now(), elapsed = 0;
       let t0 = null;
       const play = q.get('play') ?? 'still';
-      const frame = (dt) => {
+      const frame = () => {
         const now = performance.now();
         if (recording && count < MAX) frames[count++] = now - last;
         last = now;
@@ -125,9 +145,27 @@
         begin() { count = 0; last = performance.now(); recording = true; },
         end() { recording = false; return Array.from(frames.subarray(0, count)); },
       };
-      window.__dev = { tier, counts: veg.counts, budget: BUDGETS[tier], placements: veg.placements, terrainHeight, inClearing, riverX, meshes: veg.meshes, camera, anchor };
+      window.__dev = {
+        get tier() { return tier; }, get counts() { return veg.counts; }, get budget() { return BUDGETS[tier]; },
+        get placements() { return veg.placements; }, get meshes() { return veg.meshes; },
+        terrainHeight, inClearing, riverX, camera, anchor,
+        /** Render one frame with the camera at view/u (for deterministic capture). */
+        renderAt(v, u = 0) { setView(v, u); follow(); renderer.render(scene, camera); },
+        /** Live tier switch like the FpsGovernor will do: swap flora and shadows, compile, render. */
+        async setTier(t) {
+          tier = pickTier(t);
+          scene.remove(veg.group);
+          veg = makeVeg(tier);
+          scene.add(veg.group);
+          shadows = BUDGETS[tier].shadows && !q.has('noshadow');
+          renderer.shadowMap.enabled = shadows;
+          sun.castShadow = shadows;
+          follow();
+          await renderer.compileAsync(scene, camera);
+          renderer.render(scene, camera);
+        },
+      };
       if (!q.has('manual')) startLoop(frame);
-      else frame(0);
       document.documentElement.dataset.ready = '1';
     </script>
   </body>

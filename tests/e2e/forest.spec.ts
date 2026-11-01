@@ -24,7 +24,7 @@ for (const tier of TIERS) {
           if (sp === 'conifer') for (const h of [24, 17, 10]) if (!isClearOfIntro(p.x, p.z, h * p.scale, 5.5 * p.scaleXZ)) nearPath++;
         }
       }
-      const inst = Object.fromEntries(Object.entries(d.meshes).map(([k, m]: any) => [k, m.count]));
+      const inst = Object.fromEntries(Object.entries(d.meshes).map(([k, ms]: any) => [k, ms.reduce((a: number, m: any) => a + m.count, 0)]));
       let maxH = -1e9;
       for (let x = -130; x <= 130; x += 5) for (let z = -190; z <= 70; z += 5) maxH = Math.max(maxH, d.terrainHeight(x, z));
       return { counts: d.counts, inst, budget: d.budget, inClearing, inWater, nearPath, maxH };
@@ -45,6 +45,6 @@ for (const tier of TIERS) {
 test('only late-Cretaceous flora, no grass', async ({ page }) => {
   await page.goto('/dinosaur/dev/forest.html?tier=low&manual');
   await page.waitForSelector('html[data-ready="1"]', { timeout: 45_000 });
-  const names = await page.evaluate(() => Object.values((window as any).__dev.meshes).map((m: any) => m.name));
-  expect(names.sort()).toEqual(['flora-conifer', 'flora-cycad', 'flora-fern', 'flora-shrub']);
+  const names = await page.evaluate(() => Object.values((window as any).__dev.meshes).flat().map((m: any) => m.name));
+  expect([...new Set(names)].sort()).toEqual(['flora-conifer', 'flora-cycad', 'flora-fern', 'flora-shrub']);
 });
