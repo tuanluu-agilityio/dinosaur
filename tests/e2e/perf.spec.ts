@@ -39,6 +39,8 @@ interface Result {
   maxMs: number;
   meanFps: number;
   errors: string[];
+  /** Frames over 50 ms: [seconds into the recording, ms]. Tells a one-off hitch from steady jank. */
+  longFrames: [number, number][];
 }
 
 const results: Result[] = [];
@@ -52,22 +54,22 @@ function quantile(sorted: number[], q: number): number {
 
 const round = (n: number) => Math.round(n * 100) / 100;
 
-test.use({
-  launchOptions: {
-    args: [
-      '--enable-unsafe-webgpu', '--enable-gpu', '--ignore-gpu-blocklist',
-      '--disable-dawn-features=use_dxc', // headless shell cannot load dxcompiler.dll on Windows; FXC works
-      '--disable-gpu-vsync', '--disable-frame-rate-limit',
-    ],
-  },
-});
+// Hardware GPU, not the smoke test's SwiftShader. Each scenario gets a fresh browser so GPU memory and
+// GC work left by the previous scenario cannot land inside the next measurement window.
+const GPU_ARGS = [
+  '--enable-unsafe-webgpu', '--enable-gpu', '--ignore-gpu-blocklist',
+  '--disable-dawn-features=use_dxc', // headless shell cannot load dxcompiler.dll on Windows; FXC works
+  '--disable-gpu-vsync', '--disable-frame-rate-limit',
+];
 
 test.describe.configure({ mode: 'serial' });
 test.setTimeout(120_000);
 
 async function measure(browser: Browser, profile: keyof typeof PROFILES, tier: string, extra = EXTRA, seconds = SECONDS): Promise<Result> {
   const p = PROFILES[profile];
-  const context = await browser.newContext({ viewport: p.viewport, deviceScaleFactor: p.deviceScaleFactor, isMobile: p.isMobile, hasTouch: p.isMobile });
+  const own = await browser.browserType().launch({ args: GPU_ARGS });
+  const baseURL = test.info().project.use.baseURL;
+  const context = await own.newContext({ baseURL, viewport: p.viewport, deviceScaleFactor: p.deviceScaleFactor, isMobile: p.isMobile, hasTouch: p.isMobile });
   const page = await context.newPage();
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(String(e)));
@@ -90,12 +92,16 @@ async function measure(browser: Browser, profile: keyof typeof PROFILES, tier: s
   await page.waitForTimeout(seconds * 1000);
   const frames = await page.evaluate(() => window.__spike!.end());
   await context.close();
+  await own.close();
   const sorted = [...frames].sort((a, b) => a - b);
   const total = frames.reduce((a, b) => a + b, 0);
+  const longFrames: [number, number][] = [];
+  let at = 0;
+  for (const f of frames) { at += f; if (f > 50) longFrames.push([round(at / 1000), round(f)]); }
   return {
     profile, tier, query, config: info.config, trexLoaded: info.trexLoaded, frames: frames.length,
     medianMs: round(quantile(sorted, 0.5)), p95Ms: round(quantile(sorted, 0.95)), p99Ms: round(quantile(sorted, 0.99)),
-    maxMs: round(sorted[sorted.length - 1] ?? NaN), meanFps: round((frames.length * 1000) / total), errors,
+    maxMs: round(sorted[sorted.length - 1] ?? NaN), meanFps: round((frames.length * 1000) / total), errors, longFrames,
   };
 }
 
