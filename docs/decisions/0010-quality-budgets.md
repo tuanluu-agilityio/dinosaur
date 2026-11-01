@@ -25,6 +25,7 @@ ADR 0006 asks for 60 fps on a mid-range desktop and p95 ≤ 33 ms on a mid-range
    - no scenario logs a console error
 
    On software adapters (CI without a GPU) the gate skips. That is not a pass.
+3a. Early-angiosperm shrubs have their own budget field, `shrubs` (600 high / 300 medium / 150 low, 10% of ferns), added by the forest task (#25). Provisional until the forest scenario of the gate measures it.
 4. "Provisional" values were not measured by the spike. The task that adds each feature (forest vegetation, godrays, Verlet) must measure it with the gate. If it is over budget, lower the number first and change code second, in separate commits (`docs/conventions/performance.md`).
 
 ## Consequences
