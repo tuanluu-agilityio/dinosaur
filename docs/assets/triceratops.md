@@ -7,10 +7,10 @@
 ## Pipeline (all headless Blender, scripts in `scripts/assets/blender/`)
 
 1. `node --env-file=<root>/.env scripts/assets/fetch.mjs triceratops` (into the untracked `assets/src/triceratops/`), then unzip `source/triceratops.zip` to `assets/src/triceratops/obj/`.
-2. `triceratops_prep.py`: import OBJ, one Catmull-Clark level, scale to 8 m nose-to-tail (horn tips to tail tip; the clips use an 11 m wide frame), head clean-up (snout subdivision, smoothed beak margin and outline, plain rostral margin, flared horn bases with a pulled-in collar lip), rebuild material (base colour + normal 2048 px, 1024 px ORM).
+2. `triceratops_prep.py`: import OBJ, one Catmull-Clark level, scale to 8 m nose-to-tail (horn tips to tail tip; the clips use an 11 m wide frame), head clean-up (snout subdivision, smoothed beak margin and outline, plain 1-2 cm rostral margin strip, flared horn bases with a pulled-in collar lip), rebuild material (base colour + normal 2048 px, 1024 px ORM).
 3. `triceratops_rig.py`: 29-bone armature, automatic weights, beak re-weight by mouth line.
 4. `triceratops_anim.py`: procedural `idle`, `walk`, `eat`; exports the GLB.
-5. `node scripts/assets/optimize.mjs <glb> public/models triceratops` gives `.high.glb` (2048 px, 65,294 tris, 6.28 MB) and `.low.glb` (1024 px, 22,852 tris, 2.65 MB).
+5. `node scripts/assets/optimize.mjs <glb> public/models triceratops` gives `.high.glb` (2048 px, 65,294 tris, 6.31 MB) and `.low.glb` (1024 px, 22,852 tris, 2.65 MB).
 6. Evidence: `turntable.py` (stills, far shot) and `triceratops_evidence.py` (1 m close-ups, clips on a ground with scrolling markers) on the `--preview` GLBs.
 
 ## Modifications

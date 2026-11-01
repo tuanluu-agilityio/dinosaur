@@ -169,7 +169,7 @@ def flatten_beak_normals(mesh, nrm, base, size):
     mask = np.zeros((size, size), dtype=bool)
     for poly in mesh.data.polygons:
         c = poly.center
-        if not (-3.45 < c.y < -2.5 and abs(c.x) < 0.6 and split_z(c.y) - 0.05 < c.z < split_z(c.y) + 0.2):
+        if not (-3.45 < c.y < -2.5 and abs(c.x) < 0.6 and split_z(c.y) - 0.005 < c.z < split_z(c.y) + 0.015):
             continue
         pts = [(uv[l].uv[0] * size, uv[l].uv[1] * size) for l in poly.loop_indices]
         for i in range(1, len(pts) - 1):
