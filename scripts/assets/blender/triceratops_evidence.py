@@ -166,7 +166,7 @@ def main():
         still(sc, cam, os.path.join(out_dir, f"{prefix}-closeup-side.png"), HEAD + Vector((1.0, 0.0, 0.1)).normalized() * 1.0, HEAD, 24)
     if "eatclose" in what:
         play(arm, "eat", 0.45 * 150 + 4)
-        still(sc, cam, os.path.join(out_dir, f"{prefix}-closeup-eat.png"), Vector((2.2, -2.4, 1.2)), Vector((0, -2.5, 0.5)), 35)
+        still(sc, cam, os.path.join(out_dir, f"{prefix}-closeup-eat.png"), Vector((2.6, -4.6, 1.3)), Vector((0, -2.5, 0.8)), 35)
     for name in [w for w in what if w in ("idle", "walk", "eat")]:
         for o in list(bpy.data.objects):
             if o.name.startswith(("Cube", "Plane", "bars")):
