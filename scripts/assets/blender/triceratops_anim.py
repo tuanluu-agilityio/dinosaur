@@ -206,7 +206,7 @@ def eat_frame(rig, t):
     rig.fk("neck1", "spine2", (math.radians(EAT["neck1"]) * env, 0, math.radians(2.0) * math.sin(tau) * env))
     rig.fk("neck2", "neck1", (math.radians(EAT["neck2"]) * env + math.radians(1.2) * chew, 0, math.radians(1.5) * math.sin(tau) * env))
     rig.fk("head", "neck2", (math.radians(EAT["head"]) * env - math.radians(2.0) * chew, 0, 0))
-    rig.fk("jaw", "head", (math.radians(8.0) * (0.5 - 0.5 * math.cos(cyc)) * gate, 0, 0))
+    rig.fk("jaw", "head", (math.radians(12.0) * (0.5 - 0.5 * math.cos(cyc)) * gate, 0, 0))
     pose_tail(rig, math.radians(2.5), tau, pitch=math.radians(1.0) * env, lag=0.45)
     stand_legs(rig)
 
