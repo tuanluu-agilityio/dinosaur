@@ -66,11 +66,12 @@ def main():
     buf[:, 1] = np.clip(1.0 - g[:, 0], 0.2, 1.0)  # roughness = 1 - glossiness
     buf[:, 2] = 0.0                              # metallic
     orm.pixels.foreach_set(buf.ravel())
+    orm.scale(512, 512)  # roughness is low-frequency; 512 keeps the shipped files inside the size budget
     orm.pack()
     bpy.data.images.remove(gloss)
     eye_d = load_scaled(os.path.join(tex, "eye_dinosaur_02_Diffuse.jpeg"), "tyrannosaurus_eye_basecolor", "sRGB")
-    eye_n = load_scaled(os.path.join(tex, "eye_dinosaur_02_Normal.jpeg"), "tyrannosaurus_eye_normal", "Non-Color")
-    for im in (diffuse, normal, eye_d, eye_n):
+    eye_d.scale(256, 256)  # eyes are a few cm wide: 256 px is plenty; eye normal map dropped
+    for im in (diffuse, normal, eye_d):
         im.pack()
 
     def make(name, base, nrm, orm_img=None, rough=0.2):
@@ -83,10 +84,11 @@ def main():
         nt.links.new(bsdf.outputs[0], out_n.inputs[0])
         t = nt.nodes.new("ShaderNodeTexImage"); t.image = base
         nt.links.new(t.outputs["Color"], bsdf.inputs["Base Color"])
-        n = nt.nodes.new("ShaderNodeTexImage"); n.image = nrm
-        nm = nt.nodes.new("ShaderNodeNormalMap")
-        nt.links.new(n.outputs["Color"], nm.inputs["Color"])
-        nt.links.new(nm.outputs["Normal"], bsdf.inputs["Normal"])
+        if nrm:
+            n = nt.nodes.new("ShaderNodeTexImage"); n.image = nrm
+            nm = nt.nodes.new("ShaderNodeNormalMap")
+            nt.links.new(n.outputs["Color"], nm.inputs["Color"])
+            nt.links.new(nm.outputs["Normal"], bsdf.inputs["Normal"])
         if orm_img:
             o = nt.nodes.new("ShaderNodeTexImage"); o.image = orm_img
             sep = nt.nodes.new("ShaderNodeSeparateColor")
@@ -100,7 +102,7 @@ def main():
     names = [m.name for m in mesh.data.materials]
     print("materials", names)
     body = make("Tyrannosaurus_Body", diffuse, normal, orm)
-    eye = make("Tyrannosaurus_Eye", eye_d, eye_n, None, 0.15)
+    eye = make("Tyrannosaurus_Eye", eye_d, None, None, 0.15)
     for i, m in enumerate(mesh.data.materials):
         mesh.data.materials[i] = eye if "eye" in m.name.lower() else body
     bpy.ops.wm.save_as_mainfile(filepath=out)

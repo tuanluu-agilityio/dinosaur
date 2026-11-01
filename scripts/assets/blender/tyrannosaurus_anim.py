@@ -282,6 +282,7 @@ def main():
     if "--test" in argv:
         test(arm, argv[argv.index("--test") + 1])
         return
+    bpy.context.scene.render.fps = FPS
     author(arm)
     arm.animation_data.action = None   # park each action on its own NLA track so the exporter writes all
     for action in list(bpy.data.actions):
@@ -294,7 +295,7 @@ def main():
     mesh.select_set(True)
     bpy.ops.export_scene.gltf(filepath=out, export_format="GLB", export_animations=True,
                               export_animation_mode="NLA_TRACKS", export_skins=True, export_yup=True,
-                              export_image_format="AUTO", export_force_sampling=True, export_frame_rate=FPS)
+                              export_image_format="AUTO", export_force_sampling=True)
     print("exported", out)
 
 
