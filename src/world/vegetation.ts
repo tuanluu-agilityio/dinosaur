@@ -4,12 +4,12 @@
 // dinosaur clearing, in water, or inside the camera intro (isClearOfIntro, src/camera/paths.ts). Instancing pattern after
 // holtsetio/aurelia src/plankton.js @724aba26 (MIT). All geometry is procedural (docs/assets/flora.md).
 import {
-  BufferAttribute, BufferGeometry, DoubleSide, Euler, Group, InstancedBufferAttribute, InstancedMesh, Matrix4, MeshStandardNodeMaterial,
+  BufferAttribute, BufferGeometry, DataTexture, DoubleSide, LinearFilter, LinearMipmapLinearFilter, NoColorSpace, RGBAFormat, RepeatWrapping, Euler, Group, InstancedBufferAttribute, InstancedMesh, Matrix4, MeshStandardNodeMaterial,
   Quaternion, Vector3,
 } from 'three/webgpu';
 import type { Camera } from 'three/webgpu';
 import {
-  attribute, cameraPosition, float, frontFacing, fwidth, hash, interleavedGradientNoise, max, mix, normalView, normalize, positionLocal, screenCoordinate, sin, smoothstep, step,
+  attribute, cameraPosition, normalMap, texture, vec2, float, frontFacing, fwidth, hash, interleavedGradientNoise, max, mix, normalView, normalize, positionLocal, screenCoordinate, sin, smoothstep, step,
   transformNormalToView, uniform, uv, vec3, vec4, Fn,
 } from 'three/tsl';
 import { BUDGETS } from '../core/budgets';
@@ -276,7 +276,7 @@ export function fernGeometry(fronds = 8, segments = 4): BufferGeometry {
 /** Cycad: stout armoured trunk (leaf bases) crowned by a rosette of long, stiff, upswept fronds with rectangular leaflets. */
 export function cycadGeometry(): BufferGeometry {
   const m = new Mesher();
-  m.tube(0, 1.5, 0.24, 0.2, 8, 0, 0, 0);
+  m.tube(0, 1.5, 0.24, 0.2, 14, 0, 0, 0);
   for (let f = 0; f < 14; f++) {
     const ring = f % 2;
     m.frond(0, 1.5, 0, (f / 14) * TAU + ring * 0.2, 2.6 - ring * 0.6, 0.3, 1.5 + ring * 0.5, 0.95, 6);
@@ -366,6 +366,81 @@ export function shrubGeometry(): BufferGeometry {
 }
 
 // ---------------------------------------------------------------- materials
+
+/**
+ * Cycad trunk armour: persistent leaf bases as irregular, overlapping rhombic scales. Baked once on the CPU into a tileable
+ * albedo map and normal map (no texture files). Each scale has a jittered centre, size and tilt; where scales overlap the
+ * higher one wins, so seams wander instead of forming a regular lattice. Each scale bulges, has a leaf scar and a dark seam.
+ */
+let armourCache: { map: DataTexture; normal: DataTexture } | null = null;
+export function cycadArmourTextures(size = 256): { map: DataTexture; normal: DataTexture } {
+  if (armourCache) return armourCache;
+  const cols = 12, rows = 16;
+  const h = (i: number, j: number, k: number) => {
+    let x = Math.imul((((i % cols) + cols) % cols) * 374761393 + (((j % rows) + rows) % rows) * 668265263 + k * 2147483647, 1274126177);
+    x = Math.imul(x ^ (x >>> 13), 1274126177);
+    return ((x ^ (x >>> 16)) >>> 0) / 4294967296;
+  };
+  const H = new Float32Array(size * size);
+  const rgba = new Uint8Array(size * size * 4);
+  for (let py = 0; py < size; py++) {
+    for (let px = 0; px < size; px++) {
+      const fu = ((px + 0.5) / size) * cols, fv = ((py + 0.5) / size) * rows;
+      let best = -1, second = -1, tint = 1, scar = 0;
+      const r0 = Math.floor(fv);
+      for (let r = r0 - 1; r <= r0 + 1; r++) {
+        const shift = (((r % rows) + rows) % rows) * 0.5 + (((r % rows) + rows) % rows) * 0.13; // staggered, slightly spiral rows
+        const c0 = Math.floor(fu - shift);
+        for (let c = c0 - 1; c <= c0 + 1; c++) {
+          const cx = c + 0.5 + shift + (h(c, r, 1) - 0.5) * 0.35;
+          const cy = r + 0.5 + (h(c, r, 2) - 0.5) * 0.3;
+          const w = 0.6 + 0.25 * h(c, r, 3), hh = 0.62 + 0.25 * h(c, r, 4);
+          const th = (h(c, r, 5) - 0.5) * 0.45;
+          const dx = fu - cx, dy = fv - cy;
+          const lx = dx * Math.cos(th) + dy * Math.sin(th), ly = -dx * Math.sin(th) + dy * Math.cos(th);
+          const d = Math.abs(lx) / w + Math.abs(ly) / hh;
+          if (d >= 1) continue;
+          // Bulging scale, lower half thicker (it overlaps the scale below); random stacking order.
+          const ht = Math.sqrt(1 - d * d) * (ly < 0 ? 1 : 0.8) * 0.8 + 0.35 * h(c, r, 6); // rounded, not faceted
+          if (ht > best) {
+            second = best; best = ht; tint = 0.8 + 0.4 * h(c, r, 7);
+            const sd = Math.abs(lx) / (0.3 * w) + Math.abs(ly - 0.12 * hh) / (0.1 * hh);
+            scar = sd < 1 ? 1 - sd : 0;
+          } else if (ht > second) second = ht;
+        }
+      }
+      const i = py * size + px;
+      const seam = best < 0 ? 0 : Math.min(1, (best - Math.max(0, second)) / 0.12);
+      H[i] = Math.max(0, best) - 0.08 * Math.min(1, scar * 3);
+      const ao = best < 0 ? 0.4 : 0.5 + 0.5 * seam;
+      const s = scar > 0 ? 0.55 : 1;
+      rgba.set([Math.round(255 * Math.min(1, 0.26 * tint * ao * s)), Math.round(255 * Math.min(1, 0.2 * tint * ao * s)), Math.round(255 * Math.min(1, 0.14 * tint * ao * s)), 255], i * 4);
+    }
+  }
+  const nrm = new Uint8Array(size * size * 4);
+  const at = (x: number, y: number) => H[((y + size) % size) * size + ((x + size) % size)];
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const k = 3;
+      const nx = -(at(x + 1, y) - at(x - 1, y)) * k, ny = -(at(x, y + 1) - at(x, y - 1)) * k;
+      const l = Math.hypot(nx, ny, 1);
+      nrm.set([Math.round((nx / l * 0.5 + 0.5) * 255), Math.round((ny / l * 0.5 + 0.5) * 255), Math.round((1 / l * 0.5 + 0.5) * 255), 255], (y * size + x) * 4);
+    }
+  }
+  const tex = (data: Uint8Array) => {
+    const t = new DataTexture(data, size, size, RGBAFormat);
+    t.wrapS = t.wrapT = RepeatWrapping;
+    t.magFilter = LinearFilter;
+    t.minFilter = LinearMipmapLinearFilter;
+    t.generateMipmaps = true;
+    t.colorSpace = NoColorSpace; // albedo values are written linear
+    t.needsUpdate = true;
+    return t;
+  };
+  armourCache = { map: tex(rgba), normal: tex(nrm) };
+  return armourCache;
+}
+
 
 type LeafKind = 'fern' | 'cycad' | 'needle' | 'ovate';
 interface FloraStyle {
@@ -503,13 +578,10 @@ function floraMaterial(opts: FloraStyle, fade: TierFade): MeshStandardNodeMateri
   const streaks = float(0.85).add(sin(uv().x.mul(TAU * 20)).mul(0.1)).add(sin(uv().x.mul(TAU * 7).add(uv().y.mul(3))).mul(0.06));
   let bark = vec3(...(opts.bark ?? [0.2, 0.14, 0.09])).mul(streaks);
   if (opts.armor) {
-    // Diamond leaf-base plates: ridges between plates are darker and bend the normal so the trunk reads as armoured.
-    const gx = uv().x.mul(8);
-    const gy = uv().y.mul(5).add(gx.floor().mod(2).mul(0.5));
-    const d = gx.fract().sub(0.5).abs().add(gy.fract().sub(0.5).abs());
-    const gap = smoothstep(0.34, 0.5, d);
-    bark = mix(vec3(...(opts.bark ?? [0.3, 0.22, 0.15])).mul(float(0.9).add(hash(gx.floor().add(gy.floor().mul(13))).mul(0.25))), vec3(0.08, 0.06, 0.04), gap);
-    normal = mix(normal, normalize(normalView.add(upView.mul(gap.sub(0.5).mul(1.1)))), float(1).sub(litW));
+    // Irregular overlapping rhombic leaf-base scales: baked albedo (with seam occlusion) and normal map.
+    const { map, normal: nmap } = cycadArmourTextures();
+    bark = texture(map, uv()).rgb.mul(tint);
+    normal = mix(normalMap(texture(nmap, uv()), vec2(1.4)), normal, litW);
   }
   mat.normalNode = normalize(normal);
   mat.colorNode = vec4(mix(bark, foliage, leafW), 1);
