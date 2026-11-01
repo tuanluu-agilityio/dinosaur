@@ -57,7 +57,7 @@ export class Godrays {
       const ray = sunDir.negate().normalize(); // direction light travels (downwards)
       const length = canopy.div(ray.y.negate().max(0.05)).mul(1.1);
       // Anchor on the canopy plane, wrapped around the point the camera sees shafts reach the ground.
-      const groundShift = vec3(ray.x, 0, ray.z).mul(length.mul(0.5));
+      const groundShift = vec3(ray.x, 0, ray.z).mul(length.mul(0.8));
       const centre = cameraPosition.sub(groundShift);
       const home = vec3(hash(id), 0, hash(id.add(1))).mul(boxXZ);
       const rel = home.xz.sub(centre.xz).div(boxXZ).add(0.5).fract().sub(0.5).mul(boxXZ);
@@ -88,7 +88,7 @@ export class Godrays {
     material.opacityNode = Fn(() => {
       const across = float(1).sub(vAcross.mul(vAcross)).max(0).pow(1.5);
       const along = smoothstep(0.0, 0.1, vAlong).mul(float(1).sub(smoothstep(0.82, 0.92, vAlong)));
-      return across.mul(along).mul(vStrength).mul(0.6);
+      return across.mul(along).mul(vStrength).mul(1.4);
     })();
 
     this.mesh = new Mesh(geometry, material);
