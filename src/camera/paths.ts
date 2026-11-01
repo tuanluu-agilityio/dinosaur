@@ -62,8 +62,10 @@ export function introCorridor(samples = 40): Array<[number, number]> {
 
 /** Clearance (m) vegetation bounds must keep from the intro path, in 3D. */
 export const INTRO_CLEARANCE = 4;
-/** Length (m) of the final pose's sight line that must stay free of crowns. */
-export const INTRO_VIEW_RANGE = 50;
+/** Length (m) of the final pose's view cone that must stay free of crowns. */
+export const INTRO_VIEW_RANGE = 90;
+/** Half-angle (rad) of the cone around the final sight line that must stay free of crowns. */
+export const INTRO_VIEW_HALF_ANGLE = 0.55;
 
 const pathSamples: Vector3[] = [];
 let viewRay: { o: Vector3; d: Vector3 } | null = null;
@@ -84,7 +86,7 @@ function prepare(): void {
  * Forest contract: a tree (trunk = vertical segment x,z from 0 to `height`; crown = sphere of
  * `crownRadius` centred at the trunk top) is clear when no part is within `INTRO_CLEARANCE`
  * (3D) of the intro path, and the crown does not intrude on the final pose's sight line
- * (first `INTRO_VIEW_RANGE` m, same clearance).
+ * (a cone of `INTRO_VIEW_HALF_ANGLE` out to `INTRO_VIEW_RANGE` m).
  */
 export function isClearOfIntro(x: number, z: number, height: number, crownRadius: number): boolean {
   prepare();
@@ -94,9 +96,11 @@ export function isClearOfIntro(x: number, z: number, height: number, crownRadius
     if (trunk < INTRO_CLEARANCE) return false;
     if (p.distanceTo(top) - crownRadius < INTRO_CLEARANCE) return false;
   }
+  // View cone of the final pose: sphere-vs-cone, so the whole closing frame looks over open ground.
   const { o, d } = viewRay!;
   const rel = top.clone().sub(o);
-  const along = Math.min(Math.max(rel.dot(d), 0), INTRO_VIEW_RANGE);
-  const closest = o.clone().addScaledVector(d, along);
-  return closest.distanceTo(top) - crownRadius >= INTRO_CLEARANCE;
+  const along = rel.dot(d);
+  if (along < -crownRadius || along > INTRO_VIEW_RANGE + crownRadius) return true;
+  const perp = rel.addScaledVector(d, -along).length();
+  return perp - crownRadius >= Math.max(0, along) * Math.tan(INTRO_VIEW_HALF_ANGLE);
 }
