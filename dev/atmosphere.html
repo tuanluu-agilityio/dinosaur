@@ -17,17 +17,22 @@
       <button data-tier="high">high</button><button data-tier="medium">medium</button><button data-tier="low">low</button></div>
     <!--
       P3-T02 dev page. Params: tier=low|medium|high, webgl=1 (force the WebGL2 backend),
-      particles=N, godrays=0|1, shadows=0|1, fog=0 (overrides for perf layering), trunks=0 (empty scene),
-      angle=<rad> + still=1 (fixed camera for screenshots).
-      window.__atmo: stats(), setTier(t), begin()/end() frame-time recording (same method as perf.spec.ts).
+      particles=N, godrays=0|1, shadows=0|1, fog=0 (overrides for perf layering), trunks=0 + dino=0 (empty scene),
+      angle=<rad> + still=1 (fixed camera for screenshots). The camera orbits a T. rex stand-in
+      (public/models/tyrannosaurus.high.glb) at close-up distance so its readability can be judged.
+      window.__atmo: stats(), setTier(t), computeCalls(), begin()/end() frame-time recording (same method as perf.spec.ts).
     -->
     <script type="module">
       import {
         Scene, PerspectiveCamera, Mesh, PlaneGeometry, CylinderGeometry, SphereGeometry, InstancedMesh,
-        MeshStandardMaterial, Object3D, WebGPURenderer, ACESFilmicToneMapping,
+        MeshStandardNodeMaterial, Object3D, WebGPURenderer, ACESFilmicToneMapping, AnimationMixer, Box3, Vector3,
       } from 'three/webgpu';
+      import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+      import { KTX2Loader } from 'three/addons/loaders/KTX2Loader.js';
+      import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
       import { createRenderer } from '/src/core/renderer.ts';
       import { Atmosphere } from '/src/world/atmosphere.ts';
+      import { groundContactAO } from '/src/world/lighting.ts';
 
       const q = new URLSearchParams(location.search);
       const t = q.get('tier');
@@ -63,22 +68,53 @@
 
       // Stand-in forest: leaf-litter ground, conifer-like trunks and a broken canopy layer.
       if (q.get('trunks') !== '0') {
-        const ground = new Mesh(new PlaneGeometry(500, 500), new MeshStandardMaterial({ color: 0x3a2f20, roughness: 1 }));
+        const ground = new Mesh(new PlaneGeometry(500, 500), new MeshStandardNodeMaterial({ color: 0x3a2f20, roughness: 1 }));
         ground.rotation.x = -Math.PI / 2;
         ground.receiveShadow = true;
         scene.add(ground);
         const rnd = (i) => { const x = Math.sin(i * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
         const N = 90, dummy = new Object3D();
-        const trunks = new InstancedMesh(new CylinderGeometry(0.35, 0.6, 1, 8), new MeshStandardMaterial({ color: 0x4a3a2a, roughness: 0.95 }), N);
-        const crowns = new InstancedMesh(new SphereGeometry(1, 12, 8), new MeshStandardMaterial({ color: 0x2c4a22, roughness: 0.9 }), N);
+        // 20 radial segments: with 8, the sun-lit face of each trunk showed as a hard bright strip at grazing angles.
+        const trunkMat = new MeshStandardNodeMaterial({ color: 0x4a3a2a, roughness: 0.95 });
+        trunkMat.aoNode = groundContactAO;
+        const trunks = new InstancedMesh(new CylinderGeometry(0.35, 0.6, 1, 20), trunkMat, N);
+        const crowns = new InstancedMesh(new SphereGeometry(1, 12, 8), new MeshStandardNodeMaterial({ color: 0x2c4a22, roughness: 0.9 }), N);
         for (let i = 0; i < N; i++) {
-          const r = 6 + rnd(i) * 70, a = rnd(i + 0.5) * Math.PI * 2, h = 14 + rnd(i + 0.25) * 10;
+          // 20 m glade: no trunk between the orbiting camera (15 m) and the stand-in.
+          const r = 20 + rnd(i) * 70, a = rnd(i + 0.5) * Math.PI * 2, h = 14 + rnd(i + 0.25) * 10;
           dummy.position.set(Math.cos(a) * r, h / 2, Math.sin(a) * r); dummy.scale.set(1, h, 1); dummy.rotation.set(0, 0, 0);
           dummy.updateMatrix(); trunks.setMatrixAt(i, dummy.matrix);
+          atmo.contactShadows.add(dummy.position.x, 0, dummy.position.z, 1.3);
           dummy.position.y = h + 1; dummy.scale.set(4 + rnd(i + 0.7) * 3, 2.2, 4 + rnd(i + 0.9) * 3);
           dummy.updateMatrix(); crowns.setMatrixAt(i, dummy.matrix);
         }
         for (const m of [trunks, crowns]) { m.castShadow = true; m.receiveShadow = true; scene.add(m); }
+      }
+
+      // Dinosaur stand-in: the merged T. rex GLB, ~12 m long, at the orbit centre. Its contact shadow follows it.
+      let mixer = null, dino = null;
+      if (q.get('dino') !== '0') {
+        const ktx2 = new KTX2Loader().setTranscoderPath(`${import.meta.env.BASE_URL}node_modules/three/examples/jsm/libs/basis/`);
+        ktx2.detectSupport(renderer);
+        const loader = new GLTFLoader().setKTX2Loader(ktx2).setMeshoptDecoder(MeshoptDecoder);
+        try {
+          const gltf = await loader.loadAsync(`${import.meta.env.BASE_URL}models/tyrannosaurus.high.glb`);
+          dino = gltf.scene;
+          const size = new Box3().setFromObject(dino).getSize(new Vector3());
+          dino.scale.setScalar(12 / Math.max(size.x, size.z));
+          const box = new Box3().setFromObject(dino);
+          dino.position.y -= box.min.y;
+          dino.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; o.frustumCulled = false; } });
+          scene.add(dino);
+          const len = Math.max(box.max.x - box.min.x, box.max.z - box.min.z);
+          const alongX = box.max.x - box.min.x >= box.max.z - box.min.z;
+          atmo.contactShadows.add(0, 0, 0, len * 0.18, 3, alongX ? 0 : Math.PI / 2);
+          if (gltf.animations[0]) { mixer = new AnimationMixer(dino); mixer.clipAction(gltf.animations[0]).play(); }
+        } catch (e) {
+          console.warn('atmosphere dev: T. rex stand-in not loaded', e);
+        } finally {
+          ktx2.dispose();
+        }
       }
 
       const resize = () => {
@@ -104,15 +140,17 @@
       const frames = new Float64Array(32768);
       let count = 0, recording = false, elapsed = 0, lastNow = performance.now();
       const still = q.get('still') === '1';
-      const angle0 = Number(q.get('angle') ?? 0.6);
-      const place = (a) => { camera.position.set(Math.cos(a) * 16, 2.2, Math.sin(a) * 16); camera.lookAt(Math.cos(a) * 16 + Math.cos(a + 1.9) * 10, 3.6, Math.sin(a) * 16 + Math.sin(a + 1.9) * 10); };
+      // Orbit the stand-in at close-up distance; angle 3.75 looks into the sun, 2.75 is oblique.
+      const angle0 = Number(q.get('angle') ?? 3.75);
+      const place = (a) => { camera.position.set(Math.cos(a) * 15, 2.4, Math.sin(a) * 15); camera.lookAt(0, 2.6, 0); };
       place(angle0);
-      atmo.update(camera);
+      atmo.update(camera, 0);
       await renderer.compileAsync(scene, camera);
 
       const api = {
         ready: true, frame: 0, backend: isWebGPU ? 'webgpu' : 'webgl2', adapter,
         stats: () => atmo.stats(), setTier,
+        computeCalls: () => renderer.info.compute.calls,
         begin() { count = 0; lastNow = performance.now(); recording = true; },
         end() { recording = false; return Array.from(frames.subarray(0, count)); },
       };
@@ -127,7 +165,8 @@
         elapsed += dt;
         // Slow orbit that turns the view towards and away from the sun.
         if (!still) place(angle0 + elapsed * 0.08);
-        atmo.update(camera);
+        mixer?.update(dt);
+        atmo.update(camera, dt);
         renderer.render(scene, camera);
         api.frame++;
       });

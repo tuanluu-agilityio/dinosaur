@@ -17,7 +17,9 @@ interface AtmoStats {
   godrays: boolean;
   shadows: boolean;
   fog: boolean;
-  compute: boolean;
+  contactShadows: boolean;
+  /** True while a tier switch is still fading particles or godrays. */
+  transitioning: boolean;
 }
 
 async function open(page: Page, query: string): Promise<string[]> {
@@ -31,9 +33,13 @@ async function open(page: Page, query: string): Promise<string[]> {
 
 const stats = (page: Page) => page.evaluate(() => (window as any).__atmo.stats() as AtmoStats);
 const frameCount = (page: Page) => page.evaluate(() => (window as any).__atmo.frame as number);
+/** renderer.info.compute.calls: compute dispatches since start, counted by the renderer itself. */
+const computeCalls = (page: Page) => page.evaluate(() => (window as any).__atmo.computeCalls() as number);
 
+/** Switch tier and wait until the cross-fade (particles, godrays) has settled. */
 async function setTier(page: Page, tier: Tier) {
   await page.evaluate((t) => (window as any).__atmo.setTier(t), tier);
+  await page.waitForFunction(() => !(window as any).__atmo.stats().transitioning, null, { timeout: 30_000 });
   const f = await frameCount(page);
   await page.waitForFunction((n) => (window as any).__atmo.frame > n + 3, f, { timeout: 30_000 });
 }
@@ -41,6 +47,7 @@ async function setTier(page: Page, tier: Tier) {
 test('tier sets the particle count and enables godrays only on high', async ({ page }) => {
   test.setTimeout(120_000);
   const errors = await open(page, 'tier=high');
+  expect(await computeCalls(page)).toBe(0);
   let s = await stats(page);
   expect(s.tier).toBe('high');
   expect(s.particles).toBe(BUDGETS.high.particles);
@@ -57,7 +64,10 @@ test('tier sets the particle count and enables godrays only on high', async ({ p
     expect(s.particlesDrawn, `${tier} drawn particles`).toBe(BUDGETS[tier].particles);
     expect(s.godrays, `${tier} godrays`).toBe(tier === 'high' && BUDGETS[tier].godrays);
     expect(s.shadows, `${tier} shadows`).toBe(BUDGETS[tier].shadows);
+    expect(s.contactShadows, `${tier} contact shadows replace the shadow map`).toBe(!BUDGETS[tier].shadows);
   }
+  expect(await frameCount(page)).toBeGreaterThan(10);
+  expect(await computeCalls(page)).toBe(0);
   expect(errors).toEqual([]);
 });
 
@@ -67,13 +77,14 @@ test('WebGL2 fallback builds the atmosphere without compute nodes', async ({ pag
   const backend = await page.evaluate(() => (window as any).__atmo.backend as string);
   expect(backend).toBe('webgl2');
   const s = await stats(page);
-  expect(s.compute).toBe(false);
   expect(s.particles).toBe(BUDGETS.medium.particles);
   expect(s.godrays).toBe(false);
   const f = await frameCount(page);
   await page.waitForFunction((n) => (window as any).__atmo.frame > n + 10, f, { timeout: 30_000 });
   await setTier(page, 'low');
   expect((await stats(page)).particles).toBe(BUDGETS.low.particles);
+  expect(await frameCount(page)).toBeGreaterThan(10);
+  expect(await computeCalls(page)).toBe(0);
   expect(errors).toEqual([]);
 });
 
@@ -121,7 +132,11 @@ async function measure(browser: Browser, profile: keyof typeof PROFILES, tier: T
   await context.close();
   await own.close();
   const sorted = [...frames].sort((a, b) => a - b);
-  return { profile, tier, query: extra, stats: info.stats, frames: frames.length, medianMs: round(q(sorted, 0.5)), p95Ms: round(q(sorted, 0.95)), p99Ms: round(q(sorted, 0.99)), maxMs: round(sorted[sorted.length - 1] ?? NaN), errors };
+  // Frames over 50 ms with their time into the recording: tells a one-off hitch from steady jank.
+  const longFrames: [number, number][] = [];
+  let at = 0;
+  for (const f of frames) { at += f; if (f > 50) longFrames.push([round(at / 1000), round(f)]); }
+  return { profile, tier, query: extra, stats: info.stats, frames: frames.length, medianMs: round(q(sorted, 0.5)), p95Ms: round(q(sorted, 0.95)), p99Ms: round(q(sorted, 0.99)), maxMs: round(sorted[sorted.length - 1] ?? NaN), longFrames, errors };
 }
 
 test.describe('atmosphere frame time', () => {
@@ -130,8 +145,14 @@ test.describe('atmosphere frame time', () => {
   test.setTimeout(180_000);
 
   test('control empty scene', async ({ browser }) => {
-    const r = await measure(browser, 'desktop', 'high', 'particles=0&fog=0&godrays=0&trunks=0&shadows=0', 4);
+    const r = await measure(browser, 'desktop', 'high', 'particles=0&fog=0&godrays=0&trunks=0&shadows=0&dino=0', 4);
     meta.control = { medianMs: r.medianMs, p95Ms: r.p95Ms, maxMs: r.maxMs, maxAllowedP95Ms: 4 };
+  });
+
+  // Same empty scene on the throttled phone proxy: hitches here are the machine/browser, not the atmosphere.
+  test('control empty scene phone', async ({ browser }) => {
+    const r = await measure(browser, 'phone', 'low', 'particles=0&fog=0&godrays=0&trunks=0&shadows=0&dino=0', 6);
+    meta.controlPhone = { medianMs: r.medianMs, p95Ms: r.p95Ms, maxMs: r.maxMs, longFrames: r.longFrames };
   });
 
   for (const profile of Object.keys(PROFILES) as (keyof typeof PROFILES)[]) {

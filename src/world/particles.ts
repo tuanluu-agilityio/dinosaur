@@ -10,11 +10,12 @@ import {
 } from 'three/webgpu';
 import {
   cameraPosition, cameraProjectionMatrix, cameraViewMatrix, float, Fn, hash, instanceIndex, mix, mx_noise_vec3,
-  positionGeometry, sin, smoothstep, step, time, triNoise3D, uniform, uv, varying, vec2, vec3, vec4,
+  positionGeometry, select, sin, smoothstep, step, time, triNoise3D, uniform, uv, varying, vec2, vec3, vec4,
 } from 'three/tsl';
 import type { Node } from 'three/webgpu';
 
 const TAU = Math.PI * 2;
+const FADE_SEC = 1.2;
 
 export interface ParticleOptions {
   /** Shared "towards the sun" uniform from Lighting. */
@@ -33,6 +34,10 @@ export class Particles {
   readonly mesh: Mesh;
   private readonly geometry: InstancedBufferGeometry;
   private _count = 0;
+  /** Particles with instanceIndex >= keep fade by `fade` (1 -> 0) during a downgrade, then are dropped. */
+  private readonly keep = uniform(0);
+  private readonly fade = uniform(1);
+  private fading = false;
 
   constructor(count: number, opts: ParticleOptions) {
     const boxXZ = uniform(opts.boxXZ ?? 44);
@@ -83,17 +88,19 @@ export class Particles {
       const horiz = vec2(toCam.x, toCam.z).length();
       const seam = float(1).sub(smoothstep(boxXZ.mul(0.32), boxXZ.mul(0.5), horiz));
       const vertical = smoothstep(0.0, 0.6, p.y).mul(float(1).sub(smoothstep(height.sub(1.5), height, p.y)));
-      const near = smoothstep(0.4, 1.6, dist);
+      // Near fade 1.5-4 m: a 4 cm mote closer than that is a blurry blob in front of the subject.
+      const near = smoothstep(1.5, 4.0, dist);
+      const leaving = select(float(instanceIndex).lessThan(this.keep), float(1), this.fade);
 
       // Forward scattering: motes light up when you look towards the sun through them.
       const view = toCam.div(dist.max(0.001)).negate(); // particle -> camera
       const forward = view.dot(sunDir).negate().max(0).pow(6); // camera looks along -view
-      const glow = mix(0.35, 1.6, forward);
+      const glow = mix(0.35, 1.4, forward);
 
       const flicker = triNoise3D(vec3(float(instanceIndex).mul(0.013), 13.12, 13.37), 0.5, time);
       const wing = sin(time.mul(23).add(phase)).mul(0.25).add(0.75);
       const kindAlpha = dust.mul(flicker.mul(0.55)).add(pollen.mul(0.7)).add(insect.mul(wing).mul(0.85));
-      vAlpha.assign(kindAlpha.mul(seam).mul(vertical).mul(near));
+      vAlpha.assign(kindAlpha.mul(seam).mul(vertical).mul(near).mul(leaving));
 
       const dustColor = vec3(1.0, 0.93, 0.78).mul(glow);
       const pollenColor = vec3(0.95, 0.82, 0.38).mul(glow.mul(0.8).add(0.2));
@@ -119,7 +126,7 @@ export class Particles {
     this.mesh.name = 'atmosphere.particles';
     this.mesh.frustumCulled = false;
     this.mesh.renderOrder = 100;
-    this.setCount(count);
+    this.setCount(count, true);
   }
 
   get count(): number {
@@ -131,10 +138,40 @@ export class Particles {
     return this.mesh.visible ? this.geometry.instanceCount : 0;
   }
 
-  setCount(n: number): void {
-    this._count = Math.max(0, Math.floor(n));
-    this.geometry.instanceCount = this._count;
-    this.mesh.visible = this._count > 0;
+  /** True while a downgrade is fading out the dropped particles. */
+  get transitioning(): boolean {
+    return this.fading;
+  }
+
+  /**
+   * Set the budgeted count. Fewer particles: the dropped ones fade out over FADE_SEC (no pop), then
+   * the draw shrinks. More (dev only; the governor never upgrades): drawn immediately.
+   */
+  setCount(n: number, immediate = false): void {
+    const next = Math.max(0, Math.floor(n));
+    const shrinking = next < this.geometry.instanceCount && !immediate;
+    this._count = next;
+    this.keep.value = next;
+    if (shrinking) {
+      this.fading = true;
+      this.fade.value = 1;
+    } else {
+      this.fading = false;
+      this.fade.value = 1;
+      this.geometry.instanceCount = next;
+      this.mesh.visible = next > 0;
+    }
+  }
+
+  /** Per frame; advances a running fade. No allocation. */
+  update(dt: number): void {
+    if (!this.fading) return;
+    this.fade.value = Math.max(0, this.fade.value - dt / FADE_SEC);
+    if (this.fade.value === 0) {
+      this.fading = false;
+      this.geometry.instanceCount = this._count;
+      this.mesh.visible = this._count > 0;
+    }
   }
 
   dispose(): void {

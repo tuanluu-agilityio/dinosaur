@@ -1,7 +1,10 @@
 // Atmosphere = lighting + sky + exponential height fog + air particles + godrays, all sized by
 // BUDGETS[tier]. setTier() changes counts and toggles tier-gated effects without rebuilding particles.
 // Nothing here uses compute nodes, so the WebGL2 fallback (isWebGPU = false) builds the same scene;
-// the flag is kept so a future compute effect can be gated on it.
+// the flag is kept so a future compute effect can be gated on it. The e2e checks this through
+// renderer.info.compute.calls, not through a flag of ours.
+// Tier downgrades cross-fade (particles, godrays) over ~1.2 s instead of popping. Tiers without a
+// shadow map get contact shadows (soft discs under registered objects) and groundContactAO.
 // Sky/fog colour shared with godrays after holtsetio/aurelia src/background.js @724aba26 (MIT).
 import { Color, type Camera, type Scene, type WebGPURenderer } from 'three/webgpu';
 import {
@@ -10,7 +13,7 @@ import {
 import type { Node } from 'three/webgpu';
 import { BUDGETS, type Budget } from '../core/budgets';
 import type { QualityTier } from '../core/quality';
-import { Lighting } from './lighting';
+import { ContactShadows, Lighting } from './lighting';
 import { Particles } from './particles';
 import { Godrays } from './godrays';
 
@@ -30,8 +33,10 @@ export interface AtmosphereStats {
   godrays: boolean;
   shadows: boolean;
   fog: boolean;
-  /** True if any compute node was built. Always false: every effect is vertex/fragment only. */
-  compute: boolean;
+  /** Contact-shadow discs drawn (tiers without a shadow map). */
+  contactShadows: boolean;
+  /** A tier switch is still fading particles or godrays. */
+  transitioning: boolean;
 }
 
 /** Height-fog parameters (per metre). Density at y = 0 and exponential falloff with height. */
@@ -53,6 +58,8 @@ function skyColor(dir: V3, sunDir: V3, horizon: Node<'color'>, zenith: Node<'col
 export class Atmosphere {
   readonly lighting: Lighting;
   readonly particles: Particles;
+  /** Register ground contact for objects (trunks, dinosaurs); drawn only when the tier has no shadow map. */
+  readonly contactShadows: ContactShadows;
   private godrays: Godrays | null = null;
   private _tier: QualityTier;
   private readonly overrides: NonNullable<AtmosphereOptions['overrides']>;
@@ -60,7 +67,7 @@ export class Atmosphere {
   readonly horizon = new Color(0x9fb3a6);
   readonly zenith = new Color(0x7f9fb4);
 
-  constructor(private readonly scene: Scene, renderer: WebGPURenderer, opts: AtmosphereOptions) {
+  constructor(private readonly scene: Scene, renderer: WebGPURenderer, opts: AtmosphereOptions & { contactCapacity?: number }) {
     this._tier = opts.tier;
     this.overrides = opts.overrides ?? {};
     this.fogOn = this.overrides.fog ?? true;
@@ -78,7 +85,10 @@ export class Atmosphere {
 
     this.particles = new Particles(b.particles, { sunDir });
     scene.add(this.particles.mesh);
-    this.applyGodrays(b.godrays);
+    this.contactShadows = new ContactShadows(opts.contactCapacity ?? 512);
+    this.contactShadows.mesh.visible = !b.shadows;
+    scene.add(this.contactShadows.mesh);
+    this.applyGodrays(b.godrays, true);
   }
 
   get tier(): QualityTier {
@@ -92,11 +102,14 @@ export class Atmosphere {
     this.particles.setCount(b.particles);
     this.applyGodrays(b.godrays);
     if (this.lighting.shadows !== b.shadows) this.lighting.setShadows(b.shadows);
+    this.contactShadows.mesh.visible = !b.shadows;
   }
 
-  /** Per frame. Keeps the sun's shadow frustum on the camera. No allocation. */
-  update(camera: Camera): void {
+  /** Per frame: sun frustum follows the camera, tier fades advance. No allocation. */
+  update(camera: Camera, dt: number): void {
     this.lighting.update(camera.position);
+    this.particles.update(dt);
+    this.godrays?.update(dt);
   }
 
   stats(): AtmosphereStats {
@@ -107,13 +120,15 @@ export class Atmosphere {
       godrays: this.godrays?.enabled ?? false,
       shadows: this.lighting.shadows,
       fog: this.fogOn,
-      compute: false,
+      contactShadows: this.contactShadows.mesh.visible && this.contactShadows.mesh.count > 0,
+      transitioning: this.particles.transitioning || (this.godrays?.transitioning ?? false),
     };
   }
 
   dispose(): void {
     this.particles.dispose();
     this.godrays?.dispose();
+    this.contactShadows.dispose();
     this.lighting.dispose();
     const s = this.scene as Scene & { backgroundNode: Node | null; fogNode: Node | null };
     s.backgroundNode = null;
@@ -124,13 +139,15 @@ export class Atmosphere {
     return { ...BUDGETS[this._tier], ...stripUndefined(this.overrides) };
   }
 
-  private applyGodrays(on: boolean): void {
+  /** Godrays build once (first time a tier allows them) and then only fade in/out. */
+  private applyGodrays(on: boolean, immediate = false): void {
     if (on && !this.godrays) {
       this.godrays = new Godrays({ sunDir: this.lighting.sunDirNode, sunColor: this.lighting.sunColor });
+      this.scene.add(this.godrays.mesh);
+      this.godrays.setEnabled(true, true);
+      return;
     }
-    if (!this.godrays) return;
-    if (on && !this.godrays.mesh.parent) this.scene.add(this.godrays.mesh);
-    if (!on) this.godrays.mesh.removeFromParent();
+    this.godrays?.setEnabled(on, immediate);
   }
 
   /**

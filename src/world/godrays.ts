@@ -14,6 +14,7 @@ import {
 import type { Color, Node } from 'three/webgpu';
 
 const TAU = Math.PI * 2;
+const FADE_SEC = 1.2;
 
 export interface GodrayOptions {
   /** Shared "towards the sun" uniform from Lighting. */
@@ -32,6 +33,9 @@ export interface GodrayOptions {
 export class Godrays {
   readonly mesh: Mesh;
   readonly shafts: number;
+  /** 0..1 master intensity; tier switches fade it instead of popping the shafts. */
+  private readonly intensity = uniform(1);
+  private target = 1;
 
   constructor(opts: GodrayOptions) {
     this.shafts = opts.shafts ?? 36;
@@ -88,7 +92,7 @@ export class Godrays {
     material.opacityNode = Fn(() => {
       const across = float(1).sub(vAcross.mul(vAcross)).max(0).pow(1.5);
       const along = smoothstep(0.0, 0.1, vAlong).mul(float(1).sub(smoothstep(0.82, 0.92, vAlong)));
-      return across.mul(along).mul(vStrength).mul(1.4);
+      return across.mul(along).mul(vStrength).mul(this.intensity).mul(1.4);
     })();
 
     this.mesh = new Mesh(geometry, material);
@@ -97,8 +101,30 @@ export class Godrays {
     this.mesh.renderOrder = 90;
   }
 
+  /** On (or fading in). Off once a fade-out has started. */
   get enabled(): boolean {
-    return this.mesh.visible && this.mesh.parent !== null;
+    return this.target > 0;
+  }
+
+  /** A fade is running. */
+  get transitioning(): boolean {
+    return this.intensity.value !== this.target;
+  }
+
+  /** Fade in/out over FADE_SEC; `immediate` skips the fade (initial build). */
+  setEnabled(on: boolean, immediate = false): void {
+    this.target = on ? 1 : 0;
+    if (immediate) this.intensity.value = this.target;
+    this.mesh.visible = this.intensity.value > 0 || on;
+  }
+
+  /** Per frame. No allocation. */
+  update(dt: number): void {
+    const v = this.intensity.value;
+    if (v === this.target) return;
+    const step = dt / FADE_SEC;
+    this.intensity.value = this.target > v ? Math.min(this.target, v + step) : Math.max(this.target, v - step);
+    this.mesh.visible = this.intensity.value > 0;
   }
 
   dispose(): void {

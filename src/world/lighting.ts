@@ -3,8 +3,11 @@
 // shadow-map texels so moving the camera does not make shadow edges shimmer.
 // After holtsetio/aurelia src/lights.js @724aba26 (MIT): one directional + one hemisphere light,
 // light direction shared with the fog/godray shaders as a uniform.
-import { Color, DirectionalLight, HemisphereLight, Object3D, Vector3, type Scene, type WebGPURenderer } from 'three/webgpu';
-import { uniform } from 'three/tsl';
+import {
+  Color, DirectionalLight, HemisphereLight, InstancedMesh, Matrix4, MeshBasicNodeMaterial, Object3D, PlaneGeometry,
+  Vector3, type Scene, type WebGPURenderer,
+} from 'three/webgpu';
+import { float, mix, positionWorld, smoothstep, uniform, uv } from 'three/tsl';
 
 /** Sun elevation above the horizon (deg). Low so shafts slant through the canopy. */
 export const SUN_ELEVATION_DEG = 24;
@@ -81,7 +84,70 @@ export class Lighting {
   }
 
   dispose(): void {
-    this.sun.shadow.dispose();
+    // Light.dispose() fires the 'dispose' event that frees the WebGPU shadow render target (~16 MB);
+    // shadow.dispose() alone does not.
+    this.sun.dispose();
+    this.hemi.dispose();
     this.object.removeFromParent();
+  }
+}
+
+/**
+ * Ambient-occlusion factor for materials standing on the forest floor (y = 0): darkens the bottom
+ * ~1.5 m so trunks and legs sit on the ground. Use as `material.aoNode`.
+ */
+export const groundContactAO = mix(float(0.45), float(1), smoothstep(0.0, 1.5, positionWorld.y));
+
+/**
+ * Contact shadows for tiers without a shadow map: one soft dark disc under each registered object,
+ * drawn as a single instanced mesh just above the ground. Static objects are set once; moving ones
+ * (dinosaurs) call set() each frame, which writes one matrix and allocates nothing.
+ */
+export class ContactShadows {
+  readonly mesh: InstancedMesh;
+  private used = 0;
+  private readonly m = new Matrix4();
+
+  constructor(capacity: number, strength = 0.7) {
+    const geometry = new PlaneGeometry(2, 2);
+    geometry.rotateX(-Math.PI / 2);
+    const material = new MeshBasicNodeMaterial({ transparent: true, depthWrite: false, fog: true });
+    material.name = 'atmosphere.contactShadows';
+    material.polygonOffset = true;
+    material.polygonOffsetFactor = -2;
+    material.polygonOffsetUnits = -2;
+    material.colorNode = uniform(new Color(0x0b0905));
+    const r = uv().mul(2).sub(1).length();
+    material.opacityNode = float(1).sub(smoothstep(0.15, 1.0, r)).pow(1.6).mul(strength);
+    this.mesh = new InstancedMesh(geometry, material, capacity);
+    this.mesh.name = 'atmosphere.contactShadows';
+    this.mesh.count = 0;
+    this.mesh.renderOrder = 10; // after opaque ground, before particles
+    this.mesh.frustumCulled = false;
+  }
+
+  /** Register a disc; returns its index for set(). */
+  add(x: number, y: number, z: number, radius: number, stretch = 1, yaw = 0): number {
+    const i = this.used++;
+    if (i >= this.mesh.instanceMatrix.count) throw new Error('ContactShadows capacity exceeded');
+    this.mesh.count = this.used;
+    this.set(i, x, y, z, radius, stretch, yaw);
+    return i;
+  }
+
+  /** Move/resize disc i. `stretch` elongates it along the object's yaw (long bodies). */
+  set(i: number, x: number, y: number, z: number, radius: number, stretch = 1, yaw = 0): void {
+    const c = Math.cos(yaw), s = Math.sin(yaw);
+    const a = radius * stretch, b = radius;
+    // Columns: x axis (scaled a, yawed), y axis (unit), z axis (scaled b, yawed), translation.
+    this.m.set(c * a, 0, s * b, x, 0, 1, 0, y + 0.02, -s * a, 0, c * b, z, 0, 0, 0, 1);
+    this.mesh.setMatrixAt(i, this.m);
+    this.mesh.instanceMatrix.needsUpdate = true;
+  }
+
+  dispose(): void {
+    this.mesh.removeFromParent();
+    this.mesh.geometry.dispose();
+    (this.mesh.material as MeshBasicNodeMaterial).dispose();
   }
 }
