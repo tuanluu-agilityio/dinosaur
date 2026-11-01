@@ -220,7 +220,7 @@ class Mesher {
   }
 }
 
-export function fernGeometry(fronds = 8, segments = 6): BufferGeometry {
+export function fernGeometry(fronds = 8, segments = 4): BufferGeometry {
   const m = new Mesher();
   for (let f = 0; f < fronds; f++) m.frond(0, 0.05, 0, (f / fronds) * TAU + (f % 2) * 0.3, 0.95 - (f % 3) * 0.12, 0.16, 1.1, 0.85, segments);
   return m.build();
@@ -238,7 +238,7 @@ export function cycadGeometry(): BufferGeometry {
 }
 
 /**
- * Metasequoia/Taxodium-like conifer, 26 m: fluted trunk with buttressed base, and an open crown of ~28 slender limbs
+ * Metasequoia/Taxodium-like conifer, 26 m: fluted trunk with buttressed base, and an open crown of ~22 slender limbs
  * (longest low down) that carry opposite pairs of small flat needle sprays plus a terminal spray. The sprays are short
  * (1-1.5 m) and finely cut, so they read as soft feathery foliage, not as fern fronds. Crown radius <= 4.6 m.
  */
@@ -252,7 +252,7 @@ export function coniferGeometry(): BufferGeometry {
     return (taper + buttress) * flute;
   }, (y) => 0.5 * (y / H) ** 2);
   const rand = rng(77);
-  const limbs = 28;
+  const limbs = 22;
   for (let i = 0; i < limbs; i++) {
     const t = i / (limbs - 1);
     const y0 = 8 + t * 16.5 + (rand() - 0.5) * 0.8;
@@ -263,7 +263,7 @@ export function coniferGeometry(): BufferGeometry {
     const dx = Math.cos(yaw), dz = Math.sin(yaw);
     m.frond(dx * r0, y0, dz * r0, yaw, L, 0.05, rise, droop, 2, 0, 0.5); // twig (part 0.5: bark colour, lit from above)
     const at = (s: number) => ({ x: dx * (r0 + L * s), y: y0 + L * (rise * s - droop * s * s), z: dz * (r0 + L * s) });
-    for (const s of [0.25, 0.45, 0.65, 0.85]) {
+    for (const s of [0.3, 0.55, 0.8]) {
       const p = at(s);
       const len = (1.25 - 0.25 * s) * (0.8 + rand() * 0.4);
       for (const side of [-1, 1]) m.frond(p.x, p.y, p.z, yaw + side * (0.95 + rand() * 0.3), len, 0.3 * len, 0.1, 0.5, 2, 0.15 + rand() * 0.5, 1, true);

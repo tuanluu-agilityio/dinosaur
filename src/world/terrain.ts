@@ -1,10 +1,10 @@
 // Hell Creek was a low coastal floodplain: flat silty ground, a meandering creek and low rolling banks.
 // Height is a pure function so vegetation and tests can sample it.
 import {
-  BufferAttribute, BufferGeometry, Group, Mesh, MeshPhysicalNodeMaterial, MeshStandardNodeMaterial, PlaneGeometry,
+  BufferAttribute, BufferGeometry, Group, Mesh, MeshStandardNodeMaterial, PlaneGeometry,
 } from 'three/webgpu';
 import {
-  abs, cross, dFdx, dFdy, dot, float, mix, mx_noise_float, normalView, normalize, positionView, positionWorld, sign, smoothstep, time, transformNormalToView, vec3,
+  abs, cross, dFdx, dFdy, dot, float, mix, mx_noise_float, normalView, normalize, positionView, positionWorld, sign, smoothstep, time, transformNormalToView, vec2, vec3,
 } from 'three/tsl';
 
 /** Clearing (ellipse) where dinosaurs live; no vegetation is placed inside. */
@@ -82,7 +82,7 @@ export function createTerrain(segments = 200): Terrain {
   // sparse moss. Fine detail drives both albedo and a perturbed normal + roughness so the near ground is not flat noise.
   const m = new MeshStandardNodeMaterial({ metalness: 0 });
   const wp = positionWorld;
-  const n2 = (s: number) => mx_noise_float(vec3(wp.x.mul(s), 0, wp.z.mul(s)));
+  const n2 = (s: number) => mx_noise_float(vec2(wp.x.mul(s), wp.z.mul(s))); // 2D noise: about half the cost of 3D
   const big = n2(0.05);
   const mid = n2(0.35);
   const fine = n2(2.2);
@@ -108,14 +108,15 @@ export function createTerrain(segments = 200): Terrain {
   ground.receiveShadow = true;
 
   // Water: low roughness, animated ripple normals, depth-tinted and translucent.
-  const wm = new MeshPhysicalNodeMaterial({ color: 0x2f4a40, roughness: 0.08, metalness: 0, transparent: true, opacity: 0.82 });
+  const wm = new MeshStandardNodeMaterial({ color: 0x2f4a40, roughness: 0.08, metalness: 0, transparent: true, opacity: 0.82 });
   const wpos = positionWorld;
   const t = time.mul(0.35);
-  const rip = (ox: number, oz: number) => mx_noise_float(vec3(wpos.x.mul(0.9).add(t).add(ox), t.mul(0.5), wpos.z.mul(0.9).sub(t.mul(0.6)).add(oz)));
-  const r0 = rip(0, 0);
-  const rx = rip(0.04, 0).sub(r0).div(0.04);
-  const rz = rip(0, 0.04).sub(r0).div(0.04);
-  wm.normalNode = transformNormalToView(normalize(vec3(rx.mul(-0.12), 1, rz.mul(-0.12))));
+  const r0 = mx_noise_float(vec2(wpos.x.mul(0.9).add(t), wpos.z.mul(0.9).sub(t.mul(0.6))));
+  const wsx = dFdx(positionView), wsy = dFdy(positionView);
+  const wr1 = cross(wsy, normalView), wr2 = cross(normalView, wsx);
+  const wdet = dot(wsx, wr1);
+  const wgrad = sign(wdet).mul(dFdx(r0).mul(wr1).add(dFdy(r0).mul(wr2)));
+  wm.normalNode = normalize(abs(wdet).mul(normalView).sub(wgrad.mul(0.03))); // ripple normal from screen derivatives: one noise evaluation
   wm.colorNode = mix(vec3(0.16, 0.26, 0.22), vec3(0.28, 0.33, 0.25), smoothstep(-0.4, 0.5, r0));
   const water = new Mesh(waterGeometry(), wm);
   water.receiveShadow = false;
