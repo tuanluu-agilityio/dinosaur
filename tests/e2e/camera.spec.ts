@@ -33,11 +33,11 @@ test('scroll zooms within min/max distance', async ({ page }) => {
       const d = (window as any).__dev;
       return d.camera.position.distanceTo(d.controls.target) as number;
     });
-  for (let i = 0; i < 30; i++) await page.mouse.wheel(0, -400);
+  for (let i = 0; i < 5; i++) await page.mouse.wheel(0, -4000);
   await page.waitForTimeout(800);
   expect(await dist()).toBeGreaterThanOrEqual(6 - 0.05);
   expect(await dist()).toBeLessThan(7);
-  for (let i = 0; i < 60; i++) await page.mouse.wheel(0, 400);
+  for (let i = 0; i < 5; i++) await page.mouse.wheel(0, 4000);
   await page.waitForTimeout(1200);
   expect(await dist()).toBeLessThanOrEqual(20 + 0.05);
   expect(await dist()).toBeGreaterThan(19);
