@@ -8,21 +8,14 @@
       "Converted source FBX (0.01 scale, 90 deg rotation applied) and uniformly scaled to a 12 m nose-to-tail animal; feet placed on z=0 (scripts/assets/blender/tyrannosaurus_prep.py)",
       "Rebuilt PBR materials from the source maps: base colour + normal kept (resized 4096->2048), roughness derived as 1 - Glossiness and packed into a 512 px ORM texture; LightingMap, SubSurface and internal AO maps unused; eye normal map dropped and eye colour map reduced to 256 px (size budget)",
       "Authored a 28-bone deform armature (spine, neck, head, jaw, 6 tail bones, 2 legs x thigh/shin/foot/toes, 2 arms x 3) because the source is static; skinned with Blender automatic weights (scripts/assets/blender/tyrannosaurus_rig.py)",
-      "Lower jaw re-weighted by a mouth plane; each tooth/claw/eye shell bound rigidly (jaw or head) so teeth do not stretch; 16 unweighted shells bound to the nearest bone; max 4 influences per vertex",
-      "Authored clips idle (4.0 s), walk (2.4 s, 1.2 m/s, toe tips planted via analytic 2-bone IK), roar (3.5 s) procedurally; every clip loops (last frame = first) (scripts/assets/blender/tyrannosaurus_anim.py)",
+      "Lower jaw re-weighted by a mouth plane, then the jaw weight relaxed over the surface (12 smoothing passes) so the throat skin has no torn spikes; each tooth/claw/eye/tongue shell bound rigidly: teeth follow the jaw if they are below the mouth plane or rooted in jaw-weighted skin, otherwise the head; unweighted shells bound to the nearest bone; max 4 influences per vertex",
+      "Authored clips idle (4.0 s), walk (2.4 s, 1.2 m/s, toe tips planted via analytic 2-bone IK, 9 cm double-step body bob, tail counter-swing), roar (3.5 s) procedurally; every clip loops (last frame = first) (scripts/assets/blender/tyrannosaurus_anim.py)",
       "Mouth: sculpt is posed gaping; clips close the jaw 31 degrees (closed mouth is the idle/walk pose)",
       "Anatomy check at 1 m: hands show 2 clawed fingers with the palm facing inward (not pronated), arm about 0.7 m, horizontal posture, knees forward; no rest-pose change needed",
       "Optimized with scripts/assets/optimize.mjs: high = full mesh, 2048 px KTX2; low = 35 % triangles, 1024 px KTX2; meshopt"
     ],
-    "files": {
-      "high": "public/models/tyrannosaurus.high.glb",
-      "low": "public/models/tyrannosaurus.low.glb"
-    },
-    "clips": {
-      "idle": "idle",
-      "walk": "walk",
-      "roar": "roar"
-    },
+    "files": { "high": "public/models/tyrannosaurus.high.glb", "low": "public/models/tyrannosaurus.low.glb" },
+    "clips": { "idle": "idle", "walk": "walk", "roar": "roar" },
     "status": "candidate"
   },
   {
@@ -31,10 +24,7 @@
     "author": "wojciechmiedziocha",
     "license": "CC-BY-4.0",
     "modifications": [],
-    "files": {
-      "high": "assets/src/triceratops/high.glb",
-      "low": "assets/src/triceratops/low.glb"
-    },
+    "files": { "high": "assets/src/triceratops/high.glb", "low": "assets/src/triceratops/low.glb" },
     "clips": {},
     "status": "candidate"
   },
@@ -44,10 +34,7 @@
     "author": "seirogan",
     "license": "CC-BY-4.0",
     "modifications": [],
-    "files": {
-      "high": "assets/src/pachycephalosaurus/high.glb",
-      "low": "assets/src/pachycephalosaurus/low.glb"
-    },
+    "files": { "high": "assets/src/pachycephalosaurus/high.glb", "low": "assets/src/pachycephalosaurus/low.glb" },
     "clips": {},
     "status": "candidate"
   }

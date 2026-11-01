@@ -91,7 +91,7 @@ def mat(color, emit=False):
 def build_ground():
     bpy.ops.mesh.primitive_plane_add(size=120, location=(0, 0, 0))
     g = bpy.context.active_object
-    g.data.materials.append(mat((0.34, 0.34, 0.34, 1)))
+    g.data.materials.append(mat((0.22, 0.22, 0.22, 1)))
     bars = bpy.data.objects.new("bars", None)
     bpy.context.scene.collection.objects.link(bars)
     spacing = WALK_SPEED * 2.4 / 3          # 0.96 m: three bars per walk cycle so the scroll loops exactly
@@ -99,16 +99,16 @@ def build_ground():
     for i in range(-20, 21):
         bpy.ops.mesh.primitive_cube_add(size=1, location=(0, i * spacing, 0.004))
         c = bpy.context.active_object
-        c.scale = (14, 0.06, 0.004)
+        c.scale = (14, 0.14, 0.004)
         c.data.materials.append(bm)
         c.parent = bars
     return bars, spacing
 
 
 def build_reference_line(z):
-    bpy.ops.mesh.primitive_cube_add(size=1, location=(3.5, 0, z))
+    bpy.ops.mesh.primitive_cube_add(size=1, location=(2.5, 0, z))
     c = bpy.context.active_object
-    c.scale = (0.02, 40, 0.012)
+    c.scale = (0.02, 40, 0.05)
     c.data.materials.append(mat((1, 0.1, 0.1, 1), emit=True))
 
 
@@ -135,8 +135,8 @@ def clip(sc, cam, arm, name, out_dir, prefix, top=False, seconds=7.2, fps=24):
         cam.rotation_euler = (0, 0, math.radians(-90))
     else:
         cam.data.ortho_scale = 14.5
-        aim(cam, (-30, 0.4, 2.6), (0, 0.4, 2.6))
-        cam.rotation_euler = (math.radians(90), 0, math.radians(-90))
+        e = math.radians(16)                    # slightly raised so the ground and its marker bars are visible
+        aim(cam, (-30 * math.cos(e), 0.4, 2.0 + 30 * math.sin(e)), (0, 0.4, 2.0))
     total = int(round(seconds * fps))
     tmp = os.path.join(out_dir, f".frames-{prefix}-{name}")
     os.makedirs(tmp, exist_ok=True)
