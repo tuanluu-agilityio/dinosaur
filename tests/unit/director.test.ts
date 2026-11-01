@@ -95,4 +95,41 @@ describe('CameraDirector', () => {
     expect(d.look.pitch).toBeCloseTo(MathUtils.degToRad(-10));
     expect(cam.position.distanceTo(pos)).toBe(0);
   });
+
+  it('focus during the intro skips it and resolves playIntro', async () => {
+    const { d } = make();
+    const intro = d.playIntro();
+    run(d, 2);
+    const f = d.focus(new Object3D(), 5);
+    await intro;
+    expect(d.state).toBe('flying');
+    run(d, 1.7);
+    await f;
+    expect(d.state).toBe('closeup');
+  });
+
+  it('state is read-only', () => {
+    const { d } = make();
+    expect(() => {
+      (d as unknown as { state: string }).state = 'closeup';
+    }).toThrow();
+  });
+
+  it('portrait aspect frames farther than desktop, within [1.2r, 4r]', async () => {
+    const dist = async (aspect: number) => {
+      const { d, cam } = make();
+      cam.aspect = aspect;
+      cam.updateProjectionMatrix();
+      const o = new Object3D();
+      const p = d.focus(o, 5);
+      run(d, 1.7);
+      await p;
+      return cam.position.distanceTo(o.position);
+    };
+    const wide = await dist(1.78);
+    const tall = await dist(390 / 844);
+    expect(wide).toBeCloseTo(12.5);
+    expect(tall).toBeGreaterThan(wide);
+    expect(tall).toBeLessThanOrEqual(20 + 1e-6);
+  });
 });

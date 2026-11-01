@@ -22,6 +22,7 @@
       } from 'three/webgpu';
       import { createRenderer, startLoop } from '/src/core/renderer.ts';
       import { CameraDirector } from '/src/camera/director.ts';
+      import { introCorridor, INTRO_CORRIDOR_RADIUS } from '/src/camera/paths.ts';
 
       const canvas = document.getElementById('scene');
       const { renderer } = await createRenderer(canvas);
@@ -40,15 +41,14 @@
       // Stand-in forest (real flora arrives in later tasks): trunks + canopy blobs, kept off the intro path.
       const trunkMat = new MeshStandardMaterial({ color: 0x5b4632 });
       const leafMat = new MeshStandardMaterial({ color: 0x2f6b3a });
+      const corridor = introCorridor(80);
       let seed = 7;
       const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
-      for (let i = 0; i < 160; i++) {
+      for (let i = 0; i < 260; i++) {
         const x = (rnd() - 0.5) * 120, z = (rnd() - 0.5) * 120;
-        // keep a corridor around the camera path (from (-34,30) to (12,14) and up the valley)
-        const dPath = Math.abs((x + 34) * 0.57 + (z - 30) * 0.82) ;
-        if (dPath < 5 && z > 0) continue;
+        if (corridor.some(([cx, cz]) => Math.hypot(x - cx, z - cz) < INTRO_CORRIDOR_RADIUS)) continue;
         if (Math.abs(x - 6) < 8 && z < 5) continue;
-        const h = 10 + rnd() * 8;
+        const h = 18 + rnd() * 8;
         const g = new Group();
         const t = new Mesh(new CylinderGeometry(0.35, 0.5, h, 6), trunkMat);
         t.position.y = h / 2;
@@ -63,7 +63,7 @@
       scene.add(dino);
 
       const camera = new PerspectiveCamera(50, 1, 0.1, 400);
-      camera.position.set(12, 14.5, 14);
+      camera.position.set(12, 38, 14);
       camera.lookAt(0, 1.5, -22);
       const director = new CameraDirector(camera, canvas);
 
