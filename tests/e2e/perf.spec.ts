@@ -46,6 +46,8 @@ interface Result {
   longFrames: [number, number][];
   /** p95 of every run when the scenario is repeated (forest rows); the row above is the run with the lowest p95. */
   runsP95Ms?: number[];
+  /** Longest frame of every run (forest rows); rubric P3 is gated on the worst of them, not only on the best run. */
+  runsMaxMs?: number[];
 }
 
 const results: Result[] = [];
@@ -134,14 +136,16 @@ for (const profile of Object.keys(PROFILES) as (keyof typeof PROFILES)[]) {
       test.setTimeout(300_000);
       // Spike method: best (minimum p95) of PERF_RUNS runs, each in a fresh browser.
       let r: Result | undefined;
-      const runs: number[] = [];
+      const runs: number[] = [], maxes: number[] = [];
       for (let i = 0; i < RUNS; i++) {
         const x = await measure(browser, profile, tier, `play=loop${FOREST_EXTRA ? `&${FOREST_EXTRA}` : ''}`, SECONDS, 'forest');
         runs.push(x.p95Ms);
+        maxes.push(x.maxMs);
         if (!r || x.p95Ms < r.p95Ms) r = x;
       }
       const best = r!;
       best.runsP95Ms = runs;
+      best.runsMaxMs = maxes;
       results.push(best);
       test.info().annotations.push({ type: 'perf', description: `forest ${profile}/${tier}: median ${best.medianMs} ms, p95 ${best.p95Ms} ms (${best.frames} frames)` });
     });
@@ -159,7 +163,7 @@ test('budget gates (ADR 0006, ADR 0010)', async () => {
   if (control) expect(control.p95Ms, 'empty-scene control p95 (ms): the machine is busy, rerun on an idle machine').toBeLessThanOrEqual(CONTROL_MAX_MS);
   for (const r of results) {
     const gate = GATES[`${r.scene === 'forest' ? 'forest ' : ''}${r.profile}/${r.tier}`];
-    if (r.scene === 'forest') expect.soft(r.maxMs, `forest ${r.profile}/${r.tier} longest frame (ms), rubric P3`).toBeLessThan(100);
+    if (r.scene === 'forest') expect.soft(Math.max(r.maxMs, ...(r.runsMaxMs ?? [])), `forest ${r.profile}/${r.tier} longest frame of all runs (ms), rubric P3`).toBeLessThan(100);
     if (gate === undefined) continue;
     expect.soft(r.frames, `${r.scene} ${r.profile}/${r.tier} frames recorded`).toBeGreaterThan(SECONDS * 20);
     expect.soft(r.p95Ms, `${r.scene} ${r.profile}/${r.tier} p95 frame time (ms)`).toBeLessThanOrEqual(gate);
