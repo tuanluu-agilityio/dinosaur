@@ -20,7 +20,7 @@
       import { createRenderer, startLoop } from '/src/core/renderer.ts';
       import { BUDGETS } from '/src/core/budgets.ts';
       import { createTerrain, terrainHeight, inClearing, riverX } from '/src/world/terrain.ts';
-      import { createVegetation, SHADOW_LAYER } from '/src/world/vegetation.ts';
+      import { createVegetation } from '/src/world/vegetation.ts';
       import { sampleIntro, INTRO_DURATION } from '/src/camera/paths.ts';
 
       const q = new URLSearchParams(location.search);
@@ -48,7 +48,6 @@
       {
         const c = sun.shadow.camera;
         c.left = -60; c.right = 60; c.top = 60; c.bottom = -60; c.near = 1; c.far = 260;
-        c.layers.enable(SHADOW_LAYER); // conifer shadow proxies live on this layer
         sun.shadow.bias = -0.0004;
         sun.shadow.normalBias = 0.05;
       }

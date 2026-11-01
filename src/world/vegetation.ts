@@ -9,7 +9,7 @@ import {
 } from 'three/webgpu';
 import type { Camera } from 'three/webgpu';
 import {
-  attribute, float, hash, interleavedGradientNoise, max, mix, normalView, normalize, positionLocal, screenCoordinate, sin, smoothstep, step,
+  attribute, cameraPosition, float, fwidth, hash, interleavedGradientNoise, max, mix, normalView, normalize, positionLocal, screenCoordinate, sin, smoothstep, step,
   transformNormalToView, uniform, uv, vec3, vec4, Fn,
 } from 'three/tsl';
 import { BUDGETS } from '../core/budgets';
@@ -176,7 +176,7 @@ class Mesher {
     return g;
   }
   /** Arching frond strip from (ox,oy,oz) heading along yaw; `roll` tilts the strip's width axis out of the horizontal. */
-  frond(ox: number, oy: number, oz: number, yaw: number, len: number, width: number, rise: number, droop: number, segs: number, roll = 0, part = 1, flat = false): void {
+  frond(ox: number, oy: number, oz: number, yaw: number, len: number, width: number, rise: number, droop: number, segs: number, roll = 0, part = 1, flat = false, bend0 = 0, bendGain = 1): void {
     const dx = Math.cos(yaw), dz = Math.sin(yaw);
     const cr = Math.cos(roll), sr = Math.sin(roll);
     const first = this.pos.length / 3;
@@ -187,7 +187,7 @@ class Mesher {
       const w = flat ? width * Math.min(1, 0.35 + t * 3) * (1 - 0.15 * t) : width * Math.sin(Math.PI * Math.min(1, t * 1.15 + 0.05)) * (1 - 0.3 * t);
       for (let side = 0; side < 2; side++) {
         const sg = side === 0 ? -1 : 1;
-        this.v([ox + dx * out - dz * w * sg * cr, oy + up + w * sg * sr, oz + dz * out + dx * w * sg * cr], [0, 1, 0], side, t, t * t, part);
+        this.v([ox + dx * out - dz * w * sg * cr, oy + up + w * sg * sr, oz + dz * out + dx * w * sg * cr], [0, 1, 0], side, t, bend0 + t * t * bendGain, part);
       }
       if (s < segs) { const b = first + s * 2; this.idx.push(b, b + 1, b + 2, b + 1, b + 3, b + 2); }
     }
@@ -208,6 +208,32 @@ class Mesher {
     for (let i = 0; i < sides; i++) {
       const a = first + i, b = a + sides + 1;
       this.idx.push(a, b, a + 1, a + 1, b, b + 1);
+    }
+  }
+  /**
+   * Drooping conical skirt from a rim (y0, r0) up to (y1, r1) near the trunk. `rim(angle)` scales the radius at the rim
+   * (fading to 1 at the top) so the outline is irregular. uv is in cells of `cell` metres: x around, y up the slope from the rim.
+   */
+  skirt(y0: number, r0: number, y1: number, r1: number, sides: number, rows: number, rim: (a: number) => number, part: number, bendOf: (y: number) => number, cell: number): void {
+    const first = this.pos.length / 3;
+    const slant = Math.hypot(r0 - r1, y1 - y0);
+    const cols = Math.max(4, Math.round((TAU * r0) / (cell * 0.55))); // sprays are narrower than long
+    for (let k = 0; k <= rows; k++) {
+      const s = k / rows;
+      const y = y0 + (y1 - y0) * (1 - (1 - s) ** 2); // steep at the rim: branch tips droop
+      for (let i = 0; i <= sides; i++) {
+        const a = (i / sides) * TAU;
+        const c = Math.cos(a), sn = Math.sin(a);
+        const r = (r0 + (r1 - r0) * s) * (1 + (rim(a) - 1) * (1 - s));
+        const n = new Vector3(c * (y1 - y0), r0 - r1, sn * (y1 - y0)).normalize();
+        this.v([c * r, y, sn * r], [n.x, n.y, n.z], (i / sides) * cols, (s * slant) / cell, bendOf(y), part);
+      }
+    }
+    for (let k = 0; k < rows; k++) {
+      for (let i = 0; i < sides; i++) {
+        const a = first + k * (sides + 1) + i, b = a + sides + 1;
+        this.idx.push(a, b, a + 1, a + 1, b, b + 1);
+      }
     }
   }
   /** Surface of revolution with per-vertex radius r(y, angle) and smooth numeric normals. */
@@ -258,50 +284,75 @@ export function cycadGeometry(): BufferGeometry {
   return m.build();
 }
 
+/** Conifer height (m) and crown: the crown covers the upper two-thirds, from CROWN_BASE to the tip. */
+const CONIFER_H = 26;
+const CROWN_BASE = 8.5;
+/** Crown radius at height y (m), before per-tier irregularity. Stays <= 4.2 m, inside the 4.6 m of the intro spheres. */
+function crownRadius(y: number): number {
+  const f = Math.min(1, Math.max(0, (CONIFER_H - y) / (CONIFER_H - CROWN_BASE)));
+  return 0.25 + 3.75 * f ** 0.9;
+}
+/** Trunk wind weight at height y, shared by trunk, crown and limb roots so they move together. */
+const trunkBend = (y: number) => 0.5 * (y / CONIFER_H) ** 2;
+
 /**
- * Metasequoia/Taxodium-like conifer, 26 m: fluted trunk with buttressed base, and an open crown of ~22 slender limbs
- * (longest low down) that carry opposite pairs of small flat needle sprays plus a terminal spray. The sprays are short
- * (1-1.5 m) and finely cut, so they read as soft feathery foliage, not as fern fronds. Crown radius <= 4.6 m.
+ * Metasequoia/Taxodium-like conifer, 26 m, as always drawn: fluted trunk with buttressed base and a dense, narrow conical
+ * crown over the upper two-thirds. The crown is a stack of irregular drooping skirts (one per branch whorl) plus a dark
+ * inner core; the shader cuts the skirts into overlapping feathery needle sprays (part 2 outer, part 3 inner), so the
+ * outline is ragged and the crown reads as foliage, not as a cone. Near trees also draw coniferSprayGeometry.
  */
 export function coniferGeometry(): BufferGeometry {
   const m = new Mesher();
-  const H = 26;
+  const H = CONIFER_H;
   m.lathe(H, 16, 20, (y, a) => {
     const taper = 0.42 * (1 - 0.88 * (y / H));
     const buttress = 1.1 * Math.exp(-y / 1.3) * (0.35 + 0.65 * Math.abs(Math.cos(a * 2.5)));
     const flute = 1 + 0.07 * Math.cos(a * 9 + y * 0.15);
     return (taper + buttress) * flute;
-  }, (y) => 0.5 * (y / H) ** 2);
-  const rand = rng(77);
-  const limbs = 22;
-  for (let i = 0; i < limbs; i++) {
-    const t = i / (limbs - 1);
-    const y0 = 8 + t * 16.5 + (rand() - 0.5) * 0.8;
-    const yaw = i * 2.399 + (rand() - 0.5) * 0.7;
-    const L = (0.6 + 3.0 * (1 - t) ** 0.85) * (0.85 + rand() * 0.3);
-    const rise = 0.12, droop = 0.35;
-    const r0 = 0.3 * (1 - 0.88 * (y0 / H));
-    const dx = Math.cos(yaw), dz = Math.sin(yaw);
-    m.frond(dx * r0, y0, dz * r0, yaw, L, 0.05, rise, droop, 2, 0, 0.5); // twig (part 0.5: bark colour, lit from above)
-    const at = (s: number) => ({ x: dx * (r0 + L * s), y: y0 + L * (rise * s - droop * s * s), z: dz * (r0 + L * s) });
-    for (const s of [0.3, 0.55, 0.8]) {
-      const p = at(s);
-      const len = (1.25 - 0.25 * s) * (0.8 + rand() * 0.4);
-      for (const side of [-1, 1]) m.frond(p.x, p.y, p.z, yaw + side * (0.95 + rand() * 0.3), len, 0.3 * len, 0.1, 0.5, 2, 0.15 + rand() * 0.5, 1, true);
-    }
-    const tip = at(1);
-    m.frond(tip.x, tip.y, tip.z, yaw + (rand() - 0.5) * 0.4, 1.1, 0.3, 0.1, 0.5, 2, 0.2, 1, true);
+  }, trunkBend);
+  const rand = rng(91);
+  // Inner core: keeps the sky from showing straight through the crown.
+  m.skirt(CROWN_BASE + 1.2, crownRadius(CROWN_BASE + 1.2) * 0.55, H - 0.6, 0.05, 10, 6, () => 1, 3, trunkBend, 0.6);
+  const tiers = 11;
+  for (let j = 0; j < tiers; j++) {
+    const y0 = CROWN_BASE + (j / tiers) * (H - CROWN_BASE - 1.2) + (rand() - 0.5) * 0.5;
+    const rim = crownRadius(y0) * (0.9 + rand() * 0.15);
+    const top = Math.min(H, y0 + 2.6 + rand() * 0.6);
+    const ph = rand() * TAU, ph2 = rand() * TAU;
+    const sides = Math.max(8, Math.round(rim * 4));
+    m.skirt(y0, rim, top, crownRadius(top) * 0.2, sides, 3, (a) => 1 + 0.16 * Math.sin(3 * a + ph) + 0.09 * Math.sin(7 * a + ph2), 2, trunkBend, 0.6);
   }
   return m.build();
 }
 
-/** Cheap stand-in for the conifer, drawn only into the shadow map: trunk plus three crown cones (no alpha test). */
-export function coniferShadowGeometry(): BufferGeometry {
+/**
+ * Near-only detail for the conifer: ~40 slender limbs with opposite pairs of small flat needle sprays and a terminal spray,
+ * reaching just past the crown skirts so the silhouette is feathery up close. Faded out with distance (LOD).
+ */
+export function coniferSprayGeometry(): BufferGeometry {
   const m = new Mesher();
-  m.tube(0, 25, 0.5, 0.1, 6, 0, 0, 0.5);
-  m.tube(7, 15, 3.6, 0.4, 8, 1, 0.1, 0.3);
-  m.tube(13, 21, 2.9, 0.3, 8, 1, 0.25, 0.5);
-  m.tube(19, 26, 1.8, 0.1, 8, 1, 0.5, 0.85);
+  const H = CONIFER_H;
+  const rand = rng(77);
+  const limbs = 40;
+  for (let i = 0; i < limbs; i++) {
+    const t = i / (limbs - 1);
+    const y0 = CROWN_BASE + 0.3 + t * (H - CROWN_BASE - 1.3) + (rand() - 0.5) * 0.5;
+    const yaw = i * 2.399 + (rand() - 0.5) * 0.7;
+    const L = Math.min(4.2, crownRadius(y0) * (0.95 + rand() * 0.15) + 0.2);
+    const rise = 0.1, droop = 0.4;
+    const r0 = 0.3 * (1 - 0.88 * (y0 / H));
+    const dx = Math.cos(yaw), dz = Math.sin(yaw);
+    const b0 = trunkBend(y0);
+    m.frond(dx * r0, y0, dz * r0, yaw, L, 0.05, rise, droop, 2, 0, 0.5, false, b0, 0.15); // twig (part 0.5: bark colour, lit from above)
+    const at = (s: number) => ({ x: dx * (r0 + L * s), y: y0 + L * (rise * s - droop * s * s), z: dz * (r0 + L * s) });
+    for (const s of [0.45, 0.65, 0.85]) {
+      const p = at(s);
+      const len = (1.3 - 0.3 * s) * (0.8 + rand() * 0.4) * Math.min(1, 0.45 + L / 3);
+      for (const side of [-1, 1]) m.frond(p.x, p.y, p.z, yaw + side * (0.95 + rand() * 0.3), len, 0.3 * len, 0.1, 0.5, 2, 0.15 + rand() * 0.5, 1, true, b0, 0.25);
+    }
+    const tip = at(1);
+    m.frond(tip.x, tip.y, tip.z, yaw + (rand() - 0.5) * 0.4, 1.1, 0.3, 0.1, 0.5, 2, 0.2, 1, true, b0, 0.25);
+  }
   return m.build();
 }
 
@@ -329,6 +380,57 @@ interface FloraStyle {
   /** cycad trunk: diamond leaf-base armour */
   armor?: boolean;
   roughness?: number;
+  /** conifer crown skirts (part 2 outer, 3 inner core) cut into feathery needle sprays */
+  crown?: boolean;
+  /** near-only detail: dissolves between LOD_NEAR and LOD_FAR metres from the camera */
+  nearOnly?: boolean;
+  /** casts shadows through its cut-outs (the shadow follows the crown) */
+  castShadow?: boolean;
+}
+
+/** Conifer spray detail dissolves between these distances (m, horizontal) from the camera; the crown skirts remain. */
+export const LOD_NEAR = 50;
+export const LOD_FAR = 70;
+
+/**
+ * One feathery Metasequoia spray: a thin rachis with opposite rows of separate linear needles slanting toward the tip.
+ * lx: distance from the rachis (0..0.5), ly: 0 at the tip .. 1 at the base, `needlesPerPx`: needle rows per pixel. When the
+ * needles get finer than a pixel the cut-out blends into the spray outline, so distant crowns stay dense instead of noisy.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function sprayCut(lx: any, ly: any, needlesPerPx: any) {
+  const w = float(0.46).mul(smoothstep(0, 0.35, ly)).mul(float(1).sub(ly.mul(0.3)));
+  const outline = float(1).sub(smoothstep(w.sub(0.05), w, lx));
+  const q = ly.mul(15).add(lx.mul(9)).fract();
+  const needles = smoothstep(0.62, 0.42, q).mul(outline);
+  // Mid distance: a serrated (pinnate) outline; far: the plain outline.
+  const e = w.mul(float(1).sub(ly.mul(15).fract().mul(0.5)));
+  const serrated = float(1).sub(smoothstep(e.sub(0.06), e, lx));
+  const rachis = float(1).sub(smoothstep(0.015, 0.035, lx));
+  const cut = mix(mix(needles, serrated, smoothstep(0.35, 0.7, needlesPerPx)), outline.mul(0.9), smoothstep(1, 2, needlesPerPx));
+  return max(cut, rachis).mul(step(0, ly));
+}
+
+/**
+ * Crown skirt cut-out: two offset layers of overlapping feathery sprays (tips pointing down the slope), each with its own
+ * jittered position and length so the rim is ragged. uv in cells (x around, y up from the rim).
+ */
+function crownMask() {
+  return Fn(() => {
+    const layer = (ox: number, oy: number, salt: number, salt2: number) => {
+      const u = uv().x.add(ox), v = uv().y.add(oy);
+      const cu = u.floor(), cv = v.floor();
+      const h = hash(cu.add(cv.mul(57)).add(salt));
+      const h2 = hash(cu.mul(13).add(cv.mul(7)).add(salt2));
+      const lx = u.fract().sub(0.5).add(h.sub(0.5).mul(0.3)).abs();
+      const t0 = h2.mul(0.35);
+      const ly = v.fract().sub(t0).div(float(1).sub(t0)); // 0 at the spray tip, 1 at its base
+      return sprayCut(lx, ly, fw);
+    };
+    const fw = fwidth(uv().y).mul(15);
+    // The second layer starts half a cell up, so only spray tips reach the rim.
+    return max(layer(0, 0, 0, 3), layer(0.5, 0.5, 17, 20).mul(step(0.5, uv().y)));
+  })();
 }
 
 /** Soft leaflet/needle cut-outs per leaf kind. uv.x across the strip, uv.y along it. */
@@ -345,9 +447,9 @@ function leafMask(kind: LeafKind) {
       const edge = float(0.98).mul(smoothstep(0.66, 0.5, lobe)).mul(smoothstep(0, 0.08, uv().y));
       return max(rachis, float(1).sub(smoothstep(edge.sub(0.12), edge, across)));
     }
-    const n = kind === 'needle' ? 64 : 22; // needle: fine opposite pairs; fern: coarser pinnae
-    const lobe = uv().y.mul(n).fract();
-    const edge = float(1).sub(lobe.mul(kind === 'needle' ? 0.4 : 0.75)).mul(smoothstep(0, 0.1, uv().y)).mul(kind === 'needle' ? float(1).sub(smoothstep(0.8, 1, uv().y).mul(0.6)) : float(1));
+    if (kind === 'needle') return sprayCut(across.mul(0.5), float(1).sub(uv().y), fwidth(uv().y).mul(15));
+    const lobe = uv().y.mul(22).fract(); // fern: pinnae
+    const edge = float(1).sub(lobe.mul(0.75)).mul(smoothstep(0, 0.1, uv().y));
     return max(rachis, float(1).sub(smoothstep(edge.sub(0.16), edge, across)));
   })();
 }
@@ -378,16 +480,28 @@ function floraMaterial(opts: FloraStyle, fade: TierFade): MeshStandardNodeMateri
   const phase = hash(rank).mul(50);
   const gain = mix(float(0.55), float(1.45), hash(rank.add(5)));
   mat.positionNode = positionLocal.add(windOffset(positionLocal.xz.add(phase), bend, gain.mul(opts.strength)));
-  const leafW = step(0.75, part), litW = step(0.25, part); // part: 0 bark, 0.5 twig (bark colour, lit from above), 1 foliage
-  const visible = step(dither(), tierVisibility(fade));
-  mat.opacityNode = mix(float(1), leafMask(opts.kind), leafW).mul(visible);
+  // part: 0 bark, 0.5 twig (bark colour, lit from above), 1 foliage card, 2 crown skirt, 3 inner crown core
+  const leafW = step(0.75, part), litW = step(0.25, part), coreW = step(2.5, part);
+  const cut = mix(float(1), opts.crown ? crownMask() : leafMask(opts.kind), leafW);
+  const tierVis = tierVisibility(fade);
+  let vis = tierVis;
+  if (opts.nearOnly) vis = vis.mul(float(1).sub(smoothstep(LOD_NEAR, LOD_FAR, inst().xy.sub(cameraPosition.xz).length())));
+  const threshold = dither().mul(0.998).add(0.001);
+  mat.opacityNode = cut.mul(step(threshold, vis));
+  if (opts.castShadow) mat.maskShadowNode = cut.mul(step(threshold, tierVis)).greaterThan(0.5);
   mat.alphaTest = 0.5;
   mat.alphaToCoverage = true; // soft edges under MSAA instead of stair-stepped cut-outs
   // Leaf cards light from above on both faces (no black undersides): foliage normals point up whichever side is seen.
   const upView = transformNormalToView(vec3(0, 1, 0));
-  let normal = mix(normalView, upView, litW.mul(0.85));
+  // Crown skirts keep more of their cone normal so the sunlit side of the crown reads as a volume.
+  let normal = mix(normalView, upView, litW.mul(opts.crown ? 0.4 : 0.85));
   const tint = mix(float(0.82), float(1.15), hash(rank.add(11)));
-  const foliage = mix(vec3(...opts.dark), vec3(...opts.light), uv().y.mul(0.6).add(bend.mul(0.4))).mul(tint);
+  const along = opts.crown ? float(1).sub(uv().y.fract()) : uv().y; // crown: spray tips are lighter than their bases
+  let foliage = mix(vec3(...opts.dark), vec3(...opts.light), along.mul(0.6).add(bend.mul(0.4))).mul(tint);
+  if (opts.crown) {
+    const sprayTint = mix(float(0.75), float(1.15), hash(uv().x.floor().add(uv().y.floor().mul(57)).add(rank)));
+    foliage = foliage.mul(mix(sprayTint, float(0.45), coreW));
+  }
   const streaks = float(0.85).add(sin(uv().x.mul(TAU * 20)).mul(0.1)).add(sin(uv().x.mul(TAU * 7).add(uv().y.mul(3))).mul(0.06));
   let bark = vec3(...(opts.bark ?? [0.2, 0.14, 0.09])).mul(streaks);
   if (opts.armor) {
@@ -406,8 +520,6 @@ function floraMaterial(opts: FloraStyle, fade: TierFade): MeshStandardNodeMateri
 
 // ---------------------------------------------------------------- scene objects
 
-/** Layer carrying the conifer shadow proxies; enable it on the sun's shadow camera (dev/forest.html does). */
-export const SHADOW_LAYER = 1;
 /** Instances are batched per spatial cell so frustum and shadow culling work (and the whole forest is not drawn for a narrow view). */
 const CHUNK = 52;
 
@@ -449,19 +561,18 @@ export function createVegetation(tier: QualityTier, seed?: number, want?: Record
   const defs: Record<Species, { geo: BufferGeometry; mat: MeshStandardNodeMaterial }> = {
     fern: { geo: fernGeometry(), mat: floraMaterial({ kind: 'fern', dark: [0.07, 0.16, 0.05], light: [0.2, 0.36, 0.11], strength: 0.9 }, fades.fern) },
     cycad: { geo: cycadGeometry(), mat: floraMaterial({ kind: 'cycad', dark: [0.04, 0.12, 0.05], light: [0.1, 0.24, 0.08], strength: 0.7, bark: [0.34, 0.26, 0.18], armor: true, roughness: 0.55 }, fades.cycad) },
-    conifer: { geo: coniferGeometry(), mat: floraMaterial({ kind: 'needle', dark: [0.1, 0.2, 0.06], light: [0.33, 0.45, 0.12], strength: 1.8, bark: [0.34, 0.17, 0.1] }, fades.conifer) },
+    conifer: { geo: coniferGeometry(), mat: floraMaterial({ kind: 'needle', crown: true, castShadow: true, dark: [0.06, 0.13, 0.04], light: [0.24, 0.36, 0.1], strength: 1.8, bark: [0.34, 0.17, 0.1] }, fades.conifer) },
     shrub: { geo: shrubGeometry(), mat: floraMaterial({ kind: 'ovate', dark: [0.1, 0.2, 0.06], light: [0.3, 0.42, 0.12], strength: 0.9, bark: [0.25, 0.18, 0.1] }, fades.shrub) },
   };
-  const shadowMat = new MeshStandardNodeMaterial({ colorWrite: false, side: DoubleSide });
-  shadowMat.positionNode = positionLocal.add(windOffset(positionLocal.xz.add(hash(inst().z).mul(50)), attribute('bend', 'float'), hash(inst().z.add(5)).mul(0.9).add(0.55).mul(1.8)));
-  shadowMat.maskShadowNode = tierVisibility(fades.conifer).greaterThan(dither());
-  const shadowGeo = coniferShadowGeometry();
+  // Near conifers add limbs of needle sprays; they dissolve with distance and do not cast shadows (the crown does).
+  const sprayGeo = coniferSprayGeometry();
+  const sprayMat = floraMaterial({ kind: 'needle', nearOnly: true, dark: [0.06, 0.13, 0.04], light: [0.24, 0.36, 0.1], strength: 1.8, bark: [0.34, 0.17, 0.1] }, fades.conifer);
 
   const group = new Group();
   const meshes = { fern: [], cycad: [], conifer: [], shrub: [] } as Record<Species, InstancedMesh[]>;
   const chunks = { fern: [], cycad: [], conifer: [], shrub: [] } as Record<Species, Chunk[]>;
   const owned: BufferGeometry[] = [];
-  const proxies: InstancedMesh[] = [];
+  const sprays: InstancedMesh[] = [];
   const m4 = new Matrix4(), q = new Quaternion(), eul = new Euler(0, 0, 0, 'YXZ'), s3 = new Vector3(), p3 = new Vector3();
   const build = (geo: BufferGeometry, mat: MeshStandardNodeMaterial, list: Array<[Placement, number]>, name: string): InstancedMesh => {
     const data = new Float32Array(list.length * 4);
@@ -492,12 +603,10 @@ export function createVegetation(tier: QualityTier, seed?: number, want?: Record
       meshes[sp].push(mesh);
       const chunk: Chunk = { mesh, ranks: list.map(([, r]) => r), extra: [] };
       if (sp === 'conifer') {
-        // Only the cheap proxy casts shadows (layer SHADOW_LAYER, seen by the shadow camera but not the main one).
-        const proxy = build(shadowGeo, shadowMat, list, 'flora-conifer-shadow');
-        proxy.layers.set(SHADOW_LAYER);
-        group.add(proxy);
-        chunk.extra.push(proxy);
-        proxies.push(proxy);
+        const detail = build(sprayGeo, sprayMat, list, 'flora-conifer-sprays');
+        group.add(detail);
+        chunk.extra.push(detail);
+        sprays.push(detail);
       }
       chunks[sp].push(chunk);
     }
@@ -506,9 +615,11 @@ export function createVegetation(tier: QualityTier, seed?: number, want?: Record
   const applyShadows = (on: boolean) => {
     // Ferns are low and dense: shadow lookups there cost frame time and show little.
     for (const sp of ORDER) for (const m of meshes[sp]) m.receiveShadow = on && sp !== 'fern';
-    for (const p of proxies) p.castShadow = on;
+    for (const m of meshes.conifer) m.castShadow = on; // the crown's cut-outs shape the shadow
+    for (const m of sprays) m.receiveShadow = on;
   };
   applyShadows(BUDGETS[tier].shadows);
+  const camPos = new Vector3();
   const fading = new Set<Species>();
   const draw = (sp: Species, n: number) => {
     for (const c of chunks[sp]) {
@@ -533,7 +644,15 @@ export function createVegetation(tier: QualityTier, seed?: number, want?: Record
       }
       veg.placements = slice();
     },
-    update(dt) {
+    update(dt, camera) {
+      // Skip spray chunks that are entirely beyond the LOD range (the shader dissolves the rest per plant).
+      if (camera) {
+        camera.getWorldPosition(camPos);
+        for (const m of sprays) {
+          const bs = m.boundingSphere!;
+          m.visible = Math.hypot(bs.center.x - camPos.x, bs.center.z - camPos.z) - bs.radius < LOD_FAR;
+        }
+      }
       for (const sp of fading) {
         const f = fades[sp];
         f.p.value = Math.min(1, (f.p.value as number) + dt / TIER_FADE_SECONDS);
@@ -544,7 +663,7 @@ export function createVegetation(tier: QualityTier, seed?: number, want?: Record
       group.removeFromParent();
       for (const g of owned) g.dispose();
       for (const sp of ORDER) { defs[sp].geo.dispose(); defs[sp].mat.dispose(); }
-      shadowGeo.dispose(); shadowMat.dispose();
+      sprayGeo.dispose(); sprayMat.dispose();
     },
   };
   for (const sp of ORDER) draw(sp, counts[sp]);
