@@ -9,7 +9,7 @@ import {
 } from 'three/webgpu';
 import type { Camera } from 'three/webgpu';
 import {
-  attribute, cameraPosition, float, fwidth, hash, interleavedGradientNoise, max, mix, normalView, normalize, positionLocal, screenCoordinate, sin, smoothstep, step,
+  attribute, cameraPosition, float, frontFacing, fwidth, hash, interleavedGradientNoise, max, mix, normalView, normalize, positionLocal, screenCoordinate, sin, smoothstep, step,
   transformNormalToView, uniform, uv, vec3, vec4, Fn,
 } from 'three/tsl';
 import { BUDGETS } from '../core/budgets';
@@ -297,8 +297,8 @@ const trunkBend = (y: number) => 0.5 * (y / CONIFER_H) ** 2;
 
 /**
  * Metasequoia/Taxodium-like conifer, 26 m, as always drawn: fluted trunk with buttressed base and a dense, narrow conical
- * crown over the upper two-thirds. The crown is a stack of irregular drooping skirts (one per branch whorl) plus a dark
- * inner core; the shader cuts the skirts into overlapping feathery needle sprays (part 2 outer, part 3 inner), so the
+ * crown over the upper two-thirds. The crown is a stack of irregular drooping skirts (one per branch whorl) and the
+ * shader cuts the skirts (part 2) into overlapping feathery needle sprays, so the
  * outline is ragged and the crown reads as foliage, not as a cone. Near trees also draw coniferSprayGeometry.
  */
 export function coniferGeometry(): BufferGeometry {
@@ -311,13 +311,11 @@ export function coniferGeometry(): BufferGeometry {
     return (taper + buttress) * flute;
   }, trunkBend);
   const rand = rng(91);
-  // Inner core: keeps the sky from showing straight through the crown.
-  m.skirt(CROWN_BASE + 1.2, crownRadius(CROWN_BASE + 1.2) * 0.55, H - 0.6, 0.05, 10, 6, () => 1, 3, trunkBend, 0.6);
-  const tiers = 11;
+  const tiers = 10;
   for (let j = 0; j < tiers; j++) {
     const y0 = CROWN_BASE + (j / tiers) * (H - CROWN_BASE - 1.2) + (rand() - 0.5) * 0.5;
     const rim = crownRadius(y0) * (0.9 + rand() * 0.15);
-    const top = Math.min(H, y0 + 2.6 + rand() * 0.6);
+    const top = Math.min(H, y0 + 1.9 + rand() * 0.4); // little overlap between skirts: overdraw is the crown's main cost
     const ph = rand() * TAU, ph2 = rand() * TAU;
     const sides = Math.max(8, Math.round(rim * 4));
     m.skirt(y0, rim, top, crownRadius(top) * 0.2, sides, 3, (a) => 1 + 0.16 * Math.sin(3 * a + ph) + 0.09 * Math.sin(7 * a + ph2), 2, trunkBend, 0.6);
@@ -380,7 +378,7 @@ interface FloraStyle {
   /** cycad trunk: diamond leaf-base armour */
   armor?: boolean;
   roughness?: number;
-  /** conifer crown skirts (part 2 outer, 3 inner core) cut into feathery needle sprays */
+  /** conifer crown skirts (part 2) cut into feathery needle sprays */
   crown?: boolean;
   /** near-only detail: dissolves between LOD_NEAR and LOD_FAR metres from the camera */
   nearOnly?: boolean;
@@ -480,8 +478,8 @@ function floraMaterial(opts: FloraStyle, fade: TierFade): MeshStandardNodeMateri
   const phase = hash(rank).mul(50);
   const gain = mix(float(0.55), float(1.45), hash(rank.add(5)));
   mat.positionNode = positionLocal.add(windOffset(positionLocal.xz.add(phase), bend, gain.mul(opts.strength)));
-  // part: 0 bark, 0.5 twig (bark colour, lit from above), 1 foliage card, 2 crown skirt, 3 inner crown core
-  const leafW = step(0.75, part), litW = step(0.25, part), coreW = step(2.5, part);
+  // part: 0 bark, 0.5 twig (bark colour, lit from above), 1 foliage card, 2 crown skirt
+  const leafW = step(0.75, part), litW = step(0.25, part);
   const cut = mix(float(1), opts.crown ? crownMask() : leafMask(opts.kind), leafW);
   const tierVis = tierVisibility(fade);
   let vis = tierVis;
@@ -500,7 +498,7 @@ function floraMaterial(opts: FloraStyle, fade: TierFade): MeshStandardNodeMateri
   let foliage = mix(vec3(...opts.dark), vec3(...opts.light), along.mul(0.6).add(bend.mul(0.4))).mul(tint);
   if (opts.crown) {
     const sprayTint = mix(float(0.75), float(1.15), hash(uv().x.floor().add(uv().y.floor().mul(57)).add(rank)));
-    foliage = foliage.mul(mix(sprayTint, float(0.45), coreW));
+    foliage = foliage.mul(sprayTint).mul(mix(float(0.5), float(1), float(frontFacing))); // inside of a skirt is shaded
   }
   const streaks = float(0.85).add(sin(uv().x.mul(TAU * 20)).mul(0.1)).add(sin(uv().x.mul(TAU * 7).add(uv().y.mul(3))).mul(0.06));
   let bark = vec3(...(opts.bark ?? [0.2, 0.14, 0.09])).mul(streaks);
