@@ -28,11 +28,19 @@ All clips loop: the last key equals the first. Clip times are real time (authore
 
 ## Anatomy self-check
 
-Thick bony dome with a ring of bony nodes around it and rows of nodes on the snout, bipedal, knees forward, ankles back, two short arms with the hands held forward and down, three visible toes per foot, one tail held horizontally off the ground (about 1 m high at the base), both feet on the ground at rest.
+Thick bony dome with a ring of bony nodes around it and rows of nodes on the snout, bipedal, knees forward, ankles back, two short arms with the hands held forward and down, three forward toes per foot, five digits per hand, one tail held horizontally off the ground (about 1 m high at the base), both feet on the ground at rest.
+
+## Digit count (counted on `task-24-pachycephalosaurus.high-digits-feet-front.png`, `-digits-hands-front.png`, `-digits-hand-side.png`)
+
+- Hands: 5 digits each (an inner thumb with a nail plus 4 fingers). Foot: 3 forward-pointing clawed toes each (II-IV); no hallux/digit I is modelled. Source geometry, unchanged. Both feet and both hands are the same, left/right symmetric.
+
+## Evidence format
+
+Clips are 24 fps. Walk video 7.0 s = 168 frames (frame i = action frame i, 4 cycles); floor marks scroll at 0.7 m/s (three marks per 1.75 s cycle); whole animal including tail inside the 6.6 m ortho frame. Idle 8.0 s = 192 frames.
 
 ## Known limits
 
 - Walk speed is fixed by the foot plant (0.7 m/s); scaling playback speed makes the feet slide.
 - At the instant of landing the toe nail dips about 1.4 cm below the floor plane (measured with `--diag`); not visible in the evidence.
 - The skin texture on the inner thigh and belly is stretched in the source UVs (fine veined streaks); left as shipped rather than blurred.
-- Hands are small (about 5 cm of visible fingers at 4.5 m body length) as sculpted; finger count was not changed.
+- Hands are small as sculpted and the nail tips are slightly angular at 1 m (visible in the hand close-up); not changed.

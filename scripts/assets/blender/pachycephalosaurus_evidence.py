@@ -175,6 +175,13 @@ def main():
     if "feet" in what:
         F = Vector((0.0, -0.05, 0.4))
         still(sc, cam, os.path.join(out_dir, f"{prefix}-closeup-feet.png"), F + Vector((-0.8, -0.5, 0.1)).normalized() * 1.0, F, 40)
+    if "digits" in what:
+        bpy.ops.mesh.primitive_plane_add(size=60, location=(0, 0, 0))
+        bpy.context.active_object.data.materials.append(mat((0.34, 0.34, 0.34, 1)))
+        for nm, tgt, off, lens in (("feet-top", (0, -0.15, 0.1), (0, -0.25, 1.0), 40), ("feet-front", (0, -0.3, 0.15), (0, -1.0, 0.25), 40),
+                                   ("hands-front", (0, -1.05, 0.62), (0, -1.0, 0.2), 50), ("hand-side", (0.28, -1.03, 0.6), (1.0, -0.1, 0.1), 60)):
+            T = Vector(tgt)
+            still(sc, cam, os.path.join(out_dir, f"{prefix}-digits-{nm}.png"), T + Vector(off).normalized() * 1.0, T, lens)
     for name in [w for w in what if w in ("idle", "walk", "walk-top")]:
         for o in list(bpy.data.objects):
             if o.name.startswith(("Cube", "Plane", "bars")):

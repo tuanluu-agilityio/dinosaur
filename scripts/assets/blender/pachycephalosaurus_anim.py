@@ -287,7 +287,7 @@ def main():
     bpy.context.scene.render.fps = FPS
     author(arm)
     arm.animation_data.action = None   # park each action on its own NLA track so the exporter writes all
-    for action in list(bpy.data.actions):
+    for action in [a for a in bpy.data.actions if a.name in CLIPS]:
         tr = arm.animation_data.nla_tracks.new()
         tr.name = action.name
         st = tr.strips.new(action.name, 1, action)

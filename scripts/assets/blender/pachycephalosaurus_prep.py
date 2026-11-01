@@ -49,6 +49,8 @@ def main():
     mesh.vertex_groups.clear()
     mesh.matrix_world.identity()
     bpy.data.objects.remove(arm)
+    for a in list(bpy.data.actions):   # drop the source leap clip(s) so nothing leaks into the export
+        bpy.data.actions.remove(a)
     mesh.name = "Pachycephalosaurus"
     mesh.data.name = "Pachycephalosaurus"
     bpy.context.view_layer.objects.active = mesh
