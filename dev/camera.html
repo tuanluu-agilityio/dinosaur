@@ -22,13 +22,13 @@
       } from 'three/webgpu';
       import { createRenderer, startLoop } from '/src/core/renderer.ts';
       import { CameraDirector } from '/src/camera/director.ts';
-      import { introCorridor, INTRO_CORRIDOR_RADIUS } from '/src/camera/paths.ts';
+      import { isClearOfIntro } from '/src/camera/paths.ts';
 
       const canvas = document.getElementById('scene');
       const { renderer } = await createRenderer(canvas);
       const scene = new Scene();
       scene.background = new Color(0x9fb8a0);
-      scene.fog = new Fog(0x9fb8a0, 20, 90);
+      scene.fog = new Fog(0x9fb8a0, 60, 260);
       scene.add(new HemisphereLight(0xdfffe0, 0x3a3020, 1.2));
       const sun = new DirectionalLight(0xfff2cc, 3);
       sun.position.set(30, 50, 20);
@@ -41,18 +41,18 @@
       // Stand-in forest (real flora arrives in later tasks): trunks + canopy blobs, kept off the intro path.
       const trunkMat = new MeshStandardMaterial({ color: 0x5b4632 });
       const leafMat = new MeshStandardMaterial({ color: 0x2f6b3a });
-      const corridor = introCorridor(80);
       let seed = 7;
       const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
-      for (let i = 0; i < 260; i++) {
-        const x = (rnd() - 0.5) * 120, z = (rnd() - 0.5) * 120;
-        if (corridor.some(([cx, cz]) => Math.hypot(x - cx, z - cz) < INTRO_CORRIDOR_RADIUS)) continue;
+      for (let i = 0; i < 700; i++) {
+        const x = (rnd() - 0.5) * 160, z = (rnd() - 0.5) * 200 - 20;
+        const h = 16 + rnd() * 8; // trunk top 16-24, crown top <= 24 + 1 + 5 = 30 = CANOPY_TOP
+        const cr = 3 + rnd() * 2;
+        if (!isClearOfIntro(x, z, h + 1, cr)) continue;
         if (Math.abs(x - 6) < 8 && z < 5) continue;
-        const h = 18 + rnd() * 8;
         const g = new Group();
         const t = new Mesh(new CylinderGeometry(0.35, 0.5, h, 6), trunkMat);
         t.position.y = h / 2;
-        const c = new Mesh(new SphereGeometry(3 + rnd() * 2, 8, 6), leafMat);
+        const c = new Mesh(new SphereGeometry(cr, 8, 6), leafMat);
         c.position.y = h + 1;
         g.add(t, c);
         g.position.set(x, 0, z);

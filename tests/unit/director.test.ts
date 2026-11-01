@@ -133,3 +133,35 @@ describe('CameraDirector', () => {
     expect(tall).toBeLessThanOrEqual(20 + 1e-6);
   });
 });
+
+import { isClearOfIntro, sampleIntro, CANOPY_TOP } from '../../src/camera/paths';
+import { Vector3 } from 'three';
+
+describe('intro clearance contract', () => {
+  it('rejects a trunk on the rising path', () => {
+    const p = new Vector3(), t = new Vector3();
+    sampleIntro(0.4, p, t);
+    expect(isClearOfIntro(p.x + 1, p.z, 25, 3)).toBe(false);
+  });
+  it('rejects a crown overhanging the path although the trunk is 5 m away', () => {
+    const p = new Vector3(), t = new Vector3();
+    sampleIntro(0.1, p, t);
+    expect(isClearOfIntro(p.x + 5, p.z, p.y + 2, 4)).toBe(false);
+  });
+  it('rejects a crown inside the final view cone', () => {
+    const p = new Vector3(), t = new Vector3();
+    sampleIntro(1, p, t);
+    const d = t.clone().sub(p).normalize().multiplyScalar(20).add(p);
+    expect(isClearOfIntro(d.x, d.z, d.y, 3)).toBe(false);
+  });
+  it('accepts vegetation far from the path', () => {
+    expect(isClearOfIntro(60, 60, 25, 4)).toBe(true);
+  });
+  it('ends above the canopy with a shallow pitch', () => {
+    const p = new Vector3(), t = new Vector3();
+    sampleIntro(1, p, t);
+    expect(p.y).toBeGreaterThanOrEqual(CANOPY_TOP + 20);
+    const pitch = Math.atan2(p.y - t.y, Math.hypot(p.x - t.x, p.z - t.z));
+    expect(pitch).toBeLessThan(0.45);
+  });
+});
