@@ -163,17 +163,23 @@ def seal_horn_bases(mesh, base, size):
 
 
 def flatten_beak_normals(mesh, nrm, base, size):
-    """Paint the tangent-space normal map flat over the UV footprint of the beak margin so the baked knob bumps
-    do not shade through the smoothed geometry."""
+    """Paint the tangent-space normal map flat and the base colour plain over a 1-2 cm strip along the mouth line
+    (the keratin edge). The strip is built from per-vertex weights (weight 1 within 0.3 cm of the line, 0 beyond 0.8 cm, i.e. about 1.6 cm wide)
+    evaluated per texel from the barycentric 3D position, so its width is set in 3D, not by face or UV-triangle size, and it
+    fades out smoothly with no hard edge."""
     uv = mesh.data.uv_layers.active.data
-    mask = np.zeros((size, size), dtype=bool)
+    verts = mesh.data.vertices
+    mask = np.zeros((size, size), dtype=np.float32)
     for poly in mesh.data.polygons:
-        c = poly.center
-        if not (-3.45 < c.y < -2.5 and abs(c.x) < 0.6 and split_z(c.y) - 0.005 < c.z < split_z(c.y) + 0.015):
+        cs = [verts[vi].co for vi in poly.vertices]
+        if not any(-3.5 < c.y < -2.45 and abs(c.x) < 0.65 and abs(c.z - split_z(c.y)) < 0.09 for c in cs):
             continue
         pts = [(uv[l].uv[0] * size, uv[l].uv[1] * size) for l in poly.loop_indices]
         for i in range(1, len(pts) - 1):
             tri = np.array([pts[0], pts[i], pts[i + 1]])
+            ty = np.array([cs[0].y, cs[i].y, cs[i + 1].y])
+            tz = np.array([cs[0].z, cs[i].z, cs[i + 1].z])
+            tx = np.array([cs[0].x, cs[i].x, cs[i + 1].x])
             x0, y0 = np.floor(tri.min(0)).astype(int) - 1
             x1, y1 = np.ceil(tri.max(0)).astype(int) + 1
             xs, ys = np.meshgrid(np.arange(max(x0, 0), min(x1, size)), np.arange(max(y0, 0), min(y1, size)))
@@ -182,13 +188,24 @@ def flatten_beak_normals(mesh, nrm, base, size):
                 continue
             a = ((tri[1, 1] - tri[2, 1]) * (xs - tri[2, 0]) + (tri[2, 0] - tri[1, 0]) * (ys - tri[2, 1])) / d
             b = ((tri[2, 1] - tri[0, 1]) * (xs - tri[2, 0]) + (tri[0, 0] - tri[2, 0]) * (ys - tri[2, 1])) / d
-            inside = (a >= -0.05) & (b >= -0.05) & (1 - a - b >= -0.05)
-            mask[ys[inside], xs[inside]] = True
-    # feather: average mask over a 5 px box so the patch blends into the surrounding skin
-    m = mask.astype(np.float32)
-    for _ in range(2):
-        m = sum(np.roll(np.roll(m, dx, 0), dy, 1) for dx in range(-2, 3) for dy in range(-2, 3)) / 25.0
-    m = np.clip(m * 1.6, 0, 1)[..., None]
+            c = 1 - a - b
+            inside = (a >= -0.03) & (b >= -0.03) & (c >= -0.03)
+            # per-texel 3D position (barycentric): the strip width is measured in 3D, so large UV triangles cannot widen it
+            py = a * ty[0] + b * ty[1] + c * ty[2]
+            pz = a * tz[0] + b * tz[1] + c * tz[2]
+            px = a * tx[0] + b * tx[1] + c * tx[2]
+            zl = 1.12 + 0.25 * np.clip((py + 3.2) / 0.95, 0.0, 1.2)
+            dz = np.abs(pz - (zl + 0.005))
+            val = np.clip(1.0 - (dz - 0.003) / 0.005, 0.0, 1.0)
+            val = val * ((py > -3.45) & (py < -2.5) & (np.abs(px) < 0.6))
+            cur = mask[ys[inside], xs[inside]]
+            mask[ys[inside], xs[inside]] = np.maximum(cur, val[inside])
+    # feather over a few texels (one 3 px box pass)
+    m = mask
+    for _ in range(1):
+        m = sum(np.roll(np.roll(m, dx, 0), dy, 1) for dx in range(-1, 2) for dy in range(-1, 2)) / 9.0
+    m = np.clip(m * 1.3, 0, 1)[..., None]
+    mask = mask > 0.3
     buf = np.empty(size * size * 4, dtype=np.float32)
     nrm.pixels.foreach_get(buf)
     buf = buf.reshape(size, size, 4)

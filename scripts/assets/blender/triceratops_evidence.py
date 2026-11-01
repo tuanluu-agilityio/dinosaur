@@ -192,7 +192,7 @@ def main():
     os.makedirs(out_dir, exist_ok=True)
     sc, cam, arm = setup(model)
     play(arm, "idle", 0)
-    if any(k in what for k in ("closeup", "eatclose", "beakbelow", "eatmax", "diag")):
+    if any(k in what for k in ("closeup", "eatclose", "beakbelow", "eatmax", "eatmax-unlit", "diag")):
         bpy.ops.mesh.primitive_plane_add(size=60, location=(0, 0, 0))
         bpy.context.active_object.data.materials.append(mat((0.34, 0.34, 0.34, 1)))
     if "diag" in what:
@@ -203,7 +203,7 @@ def main():
         sc.view_settings.view_transform = "Standard"
         still(sc, cam, os.path.join(out_dir, f"{prefix}-closeup-1m-unlit.png"), HEAD + Vector((-0.8, -0.6, 0.25)).normalized() * 1.0, HEAD, 24)
         return
-    if "closeup" in what or "beakbelow" in what or "eatmax" in what:
+    if "closeup" in what or "beakbelow" in what or "eatmax" in what or "eatmax-unlit" in what:
         no_sun_shadows()
     if "closeup" in what:
         still(sc, cam, os.path.join(out_dir, f"{prefix}-closeup-1m.png"), HEAD + Vector((-0.8, -0.6, 0.25)).normalized() * 1.0, HEAD, 24)
@@ -215,10 +215,13 @@ def main():
         play(arm, "idle", 0)
         beak = Vector((0, -3.1, 1.05))
         still(sc, cam, os.path.join(out_dir, f"{prefix}-closeup-beak-below.png"), beak + Vector((0.3, -0.7, -0.65)).normalized() * 1.0, beak, 35)
-    if "eatmax" in what:
+    if "eatmax" in what or "eatmax-unlit" in what:
+        if "eatmax-unlit" in what:                          # base colour only, to separate texture from lighting
+            make_unlit()
+            sc.view_settings.view_transform = "Standard"
         n = play(arm, "eat", 0)
         play(arm, "eat", n * 0.2867)                         # jaw at its widest in the first chomp
-        still(sc, cam, os.path.join(out_dir, f"{prefix}-eat-max-jaw.png"), Vector((1.7, -1.55, 0.5)), Vector((0, -1.55, 0.45)), 28)
+        still(sc, cam, os.path.join(out_dir, f"{prefix}-eat-max-jaw{'-unlit' if 'eatmax-unlit' in what else ''}.png"), Vector((1.7, -1.55, 0.5)), Vector((0, -1.55, 0.45)), 28)
     for name in [w for w in what if w in ("idle", "walk", "eat")]:
         for o in list(bpy.data.objects):
             if o.name.startswith(("Cube", "Plane", "bars")):
