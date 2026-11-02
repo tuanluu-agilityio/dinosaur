@@ -53,3 +53,12 @@ test('closes with the button and Escape; switches language', async ({ page }) =>
   await page.keyboard.press('Escape');
   await expect(page.locator('.dino-credits')).toBeHidden();
 });
+
+test('Tab and Shift+Tab stay inside the dialog', async ({ page }) => {
+  await open(page);
+  await page.locator('.dino-credits-btn').click();
+  const inside = () => page.evaluate(() => !!document.activeElement?.closest('.dino-credits__box'));
+  for (let i = 0; i < 40; i++) { await page.keyboard.press('Tab'); expect(await inside()).toBe(true); }
+  for (let i = 0; i < 40; i++) { await page.keyboard.press('Shift+Tab'); expect(await inside()).toBe(true); }
+  await expect(page.locator('.dino-credits__box')).toHaveAttribute('aria-labelledby', 'dino-credits-title');
+});

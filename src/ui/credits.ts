@@ -20,6 +20,9 @@ async function loadSpecies(): Promise<SpeciesJson[]> {
 
 const CC_URLS: Record<string, string> = {
   'CC-BY-4.0': 'https://creativecommons.org/licenses/by/4.0/',
+  'CC-BY-3.0': 'https://creativecommons.org/licenses/by/3.0/',
+  'CC-BY-NC-3.0': 'https://creativecommons.org/licenses/by-nc/3.0/',
+  'CC-BY-NC-4.0': 'https://creativecommons.org/licenses/by-nc/4.0/',
   'CC0-1.0': 'https://creativecommons.org/publicdomain/zero/1.0/',
 };
 
@@ -87,9 +90,9 @@ export class Credits {
     this.box = el('div', 'dino-credits__box');
     this.box.setAttribute('role', 'dialog');
     this.box.setAttribute('aria-modal', 'true');
+    this.box.tabIndex = -1;
     this.dialog.appendChild(this.box);
     this.dialog.addEventListener('click', (e) => { if (e.target === this.dialog) this.close(); });
-    window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && this.isOpen()) this.close(); });
     root.append(this.btn, this.dialog);
     onLangChange((l) => { this.lang = l; this.render(); });
     this.render();
@@ -97,18 +100,40 @@ export class Credits {
   }
 
   isOpen(): boolean { return !this.dialog.hidden; }
-  open(): void { this.dialog.hidden = false; this.box.scrollTop = 0; this.box.querySelector<HTMLElement>('button')?.focus(); }
-  close(): void { this.dialog.hidden = true; this.btn.focus(); }
+  open(): void {
+    this.dialog.hidden = false;
+    this.box.scrollTop = 0;
+    window.addEventListener('keydown', this.onKey);
+    this.box.querySelector<HTMLElement>('button')?.focus();
+  }
+  close(): void {
+    this.dialog.hidden = true;
+    window.removeEventListener('keydown', this.onKey);
+    this.btn.focus();
+  }
+
+  private readonly onKey = (e: KeyboardEvent): void => {
+    if (e.key === 'Escape') { this.close(); return; }
+    if (e.key !== 'Tab') return;
+    const f = [...this.box.querySelectorAll<HTMLElement>('button, a[href]')];
+    if (f.length === 0) return;
+    const first = f[0], last = f[f.length - 1];
+    const active = document.activeElement;
+    if (e.shiftKey && (active === first || !this.box.contains(active))) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && (active === last || !this.box.contains(active))) { e.preventDefault(); first.focus(); }
+  };
 
   private render(): void {
     this.btn.textContent = t('credits');
     const box = this.box;
     box.replaceChildren();
-    box.setAttribute('aria-label', t('credits.title'));
+    box.setAttribute('aria-labelledby', 'dino-credits-title');
     const close = el('button', 'dino-credits__close', t('credits.close'));
     close.type = 'button';
     close.addEventListener('click', () => this.close());
-    box.append(close, el('h2', undefined, t('credits.title')));
+    const title = el('h2', undefined, t('credits.title'));
+    title.id = 'dino-credits-title';
+    box.append(close, title);
 
     const species = new Map<string, SpeciesJson>();
     for (const s of this.speciesList) species.set(s.id, s);
