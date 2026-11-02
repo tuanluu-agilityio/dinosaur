@@ -20,7 +20,10 @@ export function acquireLock(path, now = Date.now(), owner) {
 // With `owner`, only that owner's lock is refreshed / released.
 export function heartbeat(path, now = Date.now(), owner) {
   const holder = read(path);
-  if (holder && (owner === undefined || holder.owner === owner)) writeFileSync(path, JSON.stringify({ ...holder, heartbeat: now }));
+  if (!holder) return { ok: false, holder: null };
+  if (owner !== undefined && holder.owner !== owner) return { ok: false, holder };
+  writeFileSync(path, JSON.stringify({ ...holder, heartbeat: now }));
+  return { ok: true };
 }
 
 export function releaseLock(path, owner) {

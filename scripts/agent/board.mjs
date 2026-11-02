@@ -52,8 +52,7 @@ async function main() {
       const r = acquireLock(path, Date.now(), issue);
       result = r.ok ? { ok: true } : { ok: false, error: 'GPU lock held by another issue', holder: r.holder };
     } else if (command === 'gpu-heartbeat') {
-      heartbeat(path, Date.now(), issue);
-      result = { ok: true };
+      result = heartbeat(path, Date.now(), issue);
     } else {
       result = releaseLock(path, issue);
     }
