@@ -19,5 +19,17 @@
   "quickFacts.diet": { "vi": "Chế độ ăn", "en": "Diet" },
   "credits": { "vi": "Ghi công", "en": "Credits" },
   "loadError": { "vi": "Không thể tải nội dung.", "en": "Could not load content." },
-  "retry": { "vi": "Thử lại", "en": "Retry" }
+  "retry": { "vi": "Thử lại", "en": "Retry" },
+  "credits.title": { "vi": "Ghi công và giấy phép", "en": "Credits and licences" },
+  "credits.close": { "vi": "Đóng", "en": "Close" },
+  "credits.models": { "vi": "Mô hình 3D", "en": "3D models" },
+  "credits.audio": { "vi": "Âm thanh", "en": "Audio" },
+  "credits.flora": { "vi": "Thực vật", "en": "Flora" },
+  "credits.code": { "vi": "Mã nguồn", "en": "Code" },
+  "credits.science": { "vi": "Nguồn khoa học", "en": "Science sources" },
+  "credits.modified": { "vi": "đã chỉnh sửa", "en": "modified" },
+  "credits.by": { "vi": "của", "en": "by" },
+  "credits.floraText": { "vi": "Toàn bộ thực vật được tạo theo thủ tục trong mã nguồn; không dùng tài nguyên bên thứ ba.", "en": "All flora is generated procedurally in code; no third-party assets are used." },
+  "credits.audioText": { "vi": "Tiếng rừng đêm, đã cắt, ghép vòng lặp và chuyển mã.", "en": "Night forest ambience, cut, looped and transcoded." },
+  "credits.codeText": { "vi": "Kỹ thuật hạt, sương mù, tia sáng, ánh sáng và gió theo Aurelia (MIT), bản 724aba26.", "en": "Particle, fog, godray, lighting and wind techniques after Aurelia (MIT), commit 724aba26." }
 }
