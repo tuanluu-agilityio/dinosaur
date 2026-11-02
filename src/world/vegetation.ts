@@ -4,7 +4,7 @@
 // dinosaur clearing, in water, or inside the camera intro (isClearOfIntro, src/camera/paths.ts). Instancing pattern after
 // holtsetio/aurelia src/plankton.js @724aba26 (MIT). All geometry is procedural (docs/assets/flora.md).
 import {
-  BufferAttribute, BufferGeometry, DataTexture, DoubleSide, LinearFilter, LinearMipmapLinearFilter, NoColorSpace, RGBAFormat, RepeatWrapping, Euler, Group, InstancedBufferAttribute, InstancedMesh, Matrix4, MeshStandardNodeMaterial,
+  BufferAttribute, BufferGeometry, DataTexture, DoubleSide, FrontSide, LinearFilter, LinearMipmapLinearFilter, NoColorSpace, RGBAFormat, RepeatWrapping, Euler, Group, InstancedBufferAttribute, InstancedMesh, Matrix4, MeshStandardNodeMaterial,
   Quaternion, Vector3,
 } from 'three/webgpu';
 import type { Camera } from 'three/webgpu';
@@ -462,8 +462,8 @@ interface FloraStyle {
 }
 
 /** Conifer spray detail dissolves between these distances (m, horizontal) from the camera; the crown skirts remain. */
-export const LOD_NEAR = 50;
-export const LOD_FAR = 70;
+export const LOD_NEAR = 35;
+export const LOD_FAR = 50;
 
 /**
  * One feathery Metasequoia spray: a thin rachis with opposite rows of separate linear needles slanting toward the tip.
@@ -544,7 +544,10 @@ function tierVisibility(f: TierFade) {
 }
 
 function floraMaterial(opts: FloraStyle, fade: TierFade): MeshStandardNodeMaterial {
-  const mat = new MeshStandardNodeMaterial({ side: DoubleSide, roughness: opts.roughness ?? 0.85, metalness: 0 });
+  // Crown skirts are drawn front-faces only: overdraw is the crown's main cost, and the far side of a skirt is hidden by the
+  // skirts in front of it. The shadow pass still uses both faces (shadowSide) so the shadow keeps the crown's full shape.
+  const mat = new MeshStandardNodeMaterial({ side: opts.crown ? FrontSide : DoubleSide, roughness: opts.roughness ?? 0.85, metalness: 0 });
+  if (opts.crown) mat.shadowSide = DoubleSide;
   const bend = attribute('bend', 'float');
   const part = attribute('part', 'float');
   const rank = inst().z;
