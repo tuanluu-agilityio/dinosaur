@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Dinosaurs dev page</title>
+    <style>
+      html, body { margin: 0; height: 100%; background: #0b0f0c; overflow: hidden; }
+      canvas { display: block; width: 100%; height: 100%; }
+      #label { position: fixed; left: 0; top: 0; display: none; pointer-events: none; padding: 4px 8px; border-radius: 4px;
+        background: rgba(10, 14, 10, 0.78); color: #f1efe4; font: 14px/1.2 system-ui, sans-serif; }
+    </style>
+  </head>
+  <body>
+    <canvas id="scene"></canvas>
+    <div id="label"></div>
+    <script type="module">
+      // Params: tier=low|medium|high, view=herd|trex|wide|side, manual (no loop; drive with __dev.step(dt)),
+      // noveg (terrain only), herd=N (triceratops herd size, default 3), pace=1..N (sim speed multiplier).
+      import { Scene, PerspectiveCamera, Fog, Color, HemisphereLight, DirectionalLight, Vector2, Vector3 } from 'three/webgpu';
+      import { createRenderer, startLoop } from '/src/core/renderer.ts';
+      import { BUDGETS } from '/src/core/budgets.ts';
+      import { createTerrain } from '/src/world/terrain.ts';
+      import { createVegetation } from '/src/world/vegetation.ts';
+      import { Dino, configureDinoLoader } from '/src/dinos/dino.ts';
+      import { DinoWorld } from '/src/dinos/world.ts';
+      import { validateManifest } from '/src/assets/manifest.ts';
+      import { loadSpecies } from '/src/content/load.ts';
+      import { getLang } from '/src/i18n/i18n.ts';
+      import manifestJson from '/assets/manifest.json';
+
+      const q = new URLSearchParams(location.search);
+      const tier = ['low', 'medium', 'high'].includes(q.get('tier')) ? q.get('tier') : 'high';
+      const shadows = BUDGETS[tier].shadows;
+      const canvas = document.getElementById('scene');
+      const { renderer, isWebGPU } = await createRenderer(canvas);
+      renderer.shadowMap.enabled = shadows;
+      configureDinoLoader(renderer);
+
+      const scene = new Scene();
+      scene.background = new Color(0xa9bfa8);
+      scene.fog = new Fog(0xa9bfa8, 70, 280);
+      scene.add(new HemisphereLight(0xdfffe0, 0x3a3020, 1.1));
+      const sun = new DirectionalLight(0xfff0c8, 3);
+      sun.castShadow = shadows;
+      sun.shadow.mapSize.set(2048, 2048);
+      { const c = sun.shadow.camera; c.left = -40; c.right = 40; c.top = 40; c.bottom = -40; c.near = 1; c.far = 260; sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.05; }
+      sun.position.set(6 + 40, 70, -35 + 30);
+      sun.target.position.set(6, 0, -35);
+      scene.add(sun, sun.target);
+      scene.add(createTerrain().group);
+      if (!q.has('noveg')) scene.add(createVegetation(tier).group);
+
+      const camera = new PerspectiveCamera(50, 1, 0.1, 500);
+      const resize = () => {
+        renderer.setSize(window.innerWidth, window.innerHeight, false);
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+      };
+      window.addEventListener('resize', resize);
+      resize();
+
+      // Only approved manifest entries are spawned (pachycephalosaurus stays out until it is approved).
+      const manifest = validateManifest(manifestJson);
+      const approved = manifest.filter((e) => e.status === 'approved');
+      const skipped = manifest.filter((e) => e.status !== 'approved').map((e) => e.species);
+      const world = new DinoWorld(scene);
+      world.label = document.getElementById('label');
+      const names = {};
+      await Promise.all(approved.map(async (e) => { names[e.species] = (await loadSpecies(e.species)).commonName; }));
+      world.commonName = (id) => names[id]?.[getLang()] ?? id;
+      const herdSize = Number(q.get('herd') ?? 3);
+      const t0 = performance.now();
+      const loadMs = {};
+      for (const e of approved) {
+        const n = e.species === 'tyrannosaurus' ? 1 : herdSize;
+        for (let i = 0; i < n; i++) {
+          const s = performance.now();
+          const d = await Dino.load(e, tier);
+          loadMs[e.species] = Math.round(performance.now() - s);
+          world.add(d, e.species === 'tyrannosaurus' ? 'wander' : 'herd');
+        }
+      }
+
+      const look = new Vector3(), pos = new Vector3();
+      const setView = (v) => {
+        const trex = world.dinos.find((d) => d.id === 'tyrannosaurus');
+        const herd = world.dinos.filter((d) => d.id === 'triceratops');
+        const at = (d) => world.positionOf(d).clone();
+        if (v === 'trex' && trex) { look.copy(at(trex)).y += 2.2; pos.copy(look).add(new Vector3(14, 2, 12)); }
+        else if (v === 'herd' && herd.length) { look.copy(at(herd[0])).y += 1.4; pos.copy(look).add(new Vector3(-10, 1.5, 9)); }
+        else if (v === 'side' && trex) { look.copy(at(trex)).y += 2; pos.copy(look).add(new Vector3(13, 1.2, 0)); }
+        else { look.set(6, 1.5, -35); pos.set(-26, 9, -8); if (camera.aspect < 1) { const c = new Vector3(); world.dinos.forEach((d) => c.add(d.root.position)); c.divideScalar(Math.max(1, world.dinos.length)); look.copy(c); pos.set(c.x, 26, c.z + 34); } }
+        camera.position.copy(pos); camera.lookAt(look);
+      };
+      setView(q.get('view') ?? 'wide');
+
+      await renderer.compileAsync(scene, camera);
+      renderer.render(scene, camera);
+
+      const pace = Number(q.get('pace') ?? 1);
+      const frames = []; let last = performance.now(), rec = false;
+      const frame = (dt) => {
+        const now = performance.now(); if (rec) frames.push(now - last); last = now;
+        world.update(dt * pace);
+        renderer.render(scene, camera);
+      };
+      const ndc = new Vector2();
+      addEventListener('pointermove', (ev) => {
+        ndc.set((ev.clientX / innerWidth) * 2 - 1, -(ev.clientY / innerHeight) * 2 + 1);
+        world.hover(ndc, camera, ev.clientX, ev.clientY);
+      });
+      const toNdc = (x, y) => new Vector2((x / innerWidth) * 2 - 1, -(y / innerHeight) * 2 + 1);
+      window.__spike = { ready: true, backend: isWebGPU ? 'webgpu' : 'webgl2', config: { tier }, begin() { frames.length = 0; rec = true; }, end() { rec = false; return frames.slice(); } };
+      window.__dev = {
+        tier, camera, world, skipped, loadMs, loadTotalMs: Math.round(performance.now() - t0), names,
+        get dinos() { return world.dinos; },
+        setView, step(dt) { world.update(dt); }, render() { renderer.render(scene, camera); },
+        pickAt(x, y) { return world.pick(toNdc(x, y), camera)?.id ?? null; },
+        screenOf(d) { const v = world.positionOf(d).clone(); v.y += d.focusRadius * 0.3; v.project(camera); return { x: ((v.x + 1) / 2) * innerWidth, y: ((1 - v.y) / 2) * innerHeight, behind: v.z > 1 }; },
+        info() { return world.dinos.map((d) => ({ id: d.id, variant: d.variant, clips: d.clips, clip: d.currentClip, focusRadius: d.focusRadius, x: d.root.position.x, z: d.root.position.z })); },
+      };
+      if (!q.has('manual')) startLoop(frame);
+      document.documentElement.dataset.ready = '1';
+    </script>
+  </body>
+</html>
