@@ -5,18 +5,20 @@
 // and records median / p95 frame time over PERF_SECONDS (default 10) after a 2 s warm-up.
 // Vsync and the frame-rate limit are disabled so frame time measures real cost, not the display cap.
 // Results: test-results/perf.json (override with PERF_OUT). Extra spike params: PERF_QUERY="ferns=4000&particles=8000".
-// Run alone so other tests do not share the GPU: npx playwright test perf --workers=1
+// Scenarios also cover dev/forest.html (terrain + flora, "forest" rows). Run alone so other tests do not share the GPU: npx playwright test perf --workers=1
 import { test, expect, type Browser } from '@playwright/test';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 
 const SECONDS = Number(process.env.PERF_SECONDS ?? 10);
 const EXTRA = process.env.PERF_QUERY ?? '';
+const RUNS = Number(process.env.PERF_RUNS ?? 3);
+const FOREST_EXTRA = process.env.PERF_FOREST_QUERY ?? '';
 const OUT = process.env.PERF_OUT ?? 'test-results/perf.json';
 const TIERS = ['high', 'medium', 'low'] as const;
 
 // Budget gates from ADR 0006: desktop high holds 60 fps; phone medium p95 <= 33 ms.
-const GATES: Record<string, number> = { 'desktop/high': 1000 / 60, 'phone/medium': 1000 / 30 };
+const GATES: Record<string, number> = { 'desktop/high': 1000 / 60, 'phone/medium': 1000 / 30, 'forest desktop/high': 10, 'forest phone/medium': 20 }; // forest rows: 60% of the frame (ADR 0010 section 2a)
 
 // An empty scene on any hardware GPU renders far faster than this; above it, other load is distorting the run.
 const CONTROL_MAX_MS = 4;
@@ -27,6 +29,7 @@ const PROFILES = {
 } as const;
 
 interface Result {
+  scene: 'spike' | 'forest';
   profile: keyof typeof PROFILES;
   tier: string;
   query: string;
@@ -41,6 +44,10 @@ interface Result {
   errors: string[];
   /** Frames over 50 ms: [seconds into the recording, ms]. Tells a one-off hitch from steady jank. */
   longFrames: [number, number][];
+  /** p95 of every run when the scenario is repeated (forest rows); the row above is the run with the lowest p95. */
+  runsP95Ms?: number[];
+  /** Longest frame of every run (forest rows); rubric P3 is gated on the worst of them, not only on the best run. */
+  runsMaxMs?: number[];
 }
 
 const results: Result[] = [];
@@ -65,7 +72,7 @@ const GPU_ARGS = [
 test.describe.configure({ mode: 'serial' });
 test.setTimeout(120_000);
 
-async function measure(browser: Browser, profile: keyof typeof PROFILES, tier: string, extra = EXTRA, seconds = SECONDS): Promise<Result> {
+async function measure(browser: Browser, profile: keyof typeof PROFILES, tier: string, extra = EXTRA, seconds = SECONDS, scene: 'spike' | 'forest' = 'spike'): Promise<Result> {
   const p = PROFILES[profile];
   const own = await browser.browserType().launch({ args: GPU_ARGS });
   const baseURL = test.info().project.use.baseURL;
@@ -75,7 +82,7 @@ async function measure(browser: Browser, profile: keyof typeof PROFILES, tier: s
   page.on('pageerror', (e) => errors.push(String(e)));
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
   const query = `tier=${tier}${extra ? `&${extra}` : ''}`;
-  await page.goto(`/dinosaur/dev/spike.html?${query}`);
+  await page.goto(`/dinosaur/dev/${scene}.html?${query}`);
   await page.waitForSelector('html[data-ready="1"]', { timeout: 60_000 });
   if (p.cpuThrottle > 1) {
     const cdp = await context.newCDPSession(page);
@@ -99,7 +106,7 @@ async function measure(browser: Browser, profile: keyof typeof PROFILES, tier: s
   let at = 0;
   for (const f of frames) { at += f; if (f > 50) longFrames.push([round(at / 1000), round(f)]); }
   return {
-    profile, tier, query, config: info.config, trexLoaded: info.trexLoaded, frames: frames.length,
+    scene, profile, tier, query, config: info.config, trexLoaded: info.trexLoaded, frames: frames.length,
     medianMs: round(quantile(sorted, 0.5)), p95Ms: round(quantile(sorted, 0.95)), p99Ms: round(quantile(sorted, 0.99)),
     maxMs: round(sorted[sorted.length - 1] ?? NaN), meanFps: round((frames.length * 1000) / total), errors, longFrames,
   };
@@ -121,21 +128,46 @@ for (const profile of Object.keys(PROFILES) as (keyof typeof PROFILES)[]) {
   }
 }
 
+// Forest scene (terrain + all flora, task #25, ADR 0010 section 4): the intro path looped, so measured frames include view changes.
+// This is the whole frame budget; other scene content (dinosaurs, atmosphere) is measured by its own scenarios.
+for (const profile of Object.keys(PROFILES) as (keyof typeof PROFILES)[]) {
+  for (const tier of TIERS) {
+    test(`forest ${profile} ${tier} frame time`, async ({ browser }) => {
+      test.setTimeout(300_000);
+      // Spike method: best (minimum p95) of PERF_RUNS runs, each in a fresh browser.
+      let r: Result | undefined;
+      const runs: number[] = [], maxes: number[] = [];
+      for (let i = 0; i < RUNS; i++) {
+        const x = await measure(browser, profile, tier, `play=loop${FOREST_EXTRA ? `&${FOREST_EXTRA}` : ''}`, SECONDS, 'forest');
+        runs.push(x.p95Ms);
+        maxes.push(x.maxMs);
+        if (!r || x.p95Ms < r.p95Ms) r = x;
+      }
+      const best = r!;
+      best.runsP95Ms = runs;
+      best.runsMaxMs = maxes;
+      results.push(best);
+      test.info().annotations.push({ type: 'perf', description: `forest ${profile}/${tier}: median ${best.medianMs} ms, p95 ${best.p95Ms} ms (${best.frames} frames)` });
+    });
+  }
+}
+
 // Gates run last so every scenario is measured and written even when one is over budget.
 test('budget gates (ADR 0006, ADR 0010)', async () => {
   test.skip(results.length === 0, 'no scenarios measured (filtered by --grep)');
-  for (const r of results) expect.soft(r.errors, `${r.profile}/${r.tier} console errors`).toEqual([]);
+  for (const r of results) expect.soft(r.errors, `${r.scene} ${r.profile}/${r.tier} console errors`).toEqual([]);
   // Software adapters (CI without a GPU) cannot judge smoothness; report but do not gate.
   const software = meta.backend !== 'webgpu' || /swiftshader|llvmpipe|software/i.test(String(meta.adapter));
   test.skip(software, `no hardware WebGPU adapter (${meta.backend}, ${meta.adapter}); perf gate not applicable`);
   const control = meta.control as { p95Ms: number } | undefined;
   if (control) expect(control.p95Ms, 'empty-scene control p95 (ms): the machine is busy, rerun on an idle machine').toBeLessThanOrEqual(CONTROL_MAX_MS);
   for (const r of results) {
-    const gate = GATES[`${r.profile}/${r.tier}`];
+    const gate = GATES[`${r.scene === 'forest' ? 'forest ' : ''}${r.profile}/${r.tier}`];
+    if (r.scene === 'forest') expect.soft(Math.max(r.maxMs, ...(r.runsMaxMs ?? [])), `forest ${r.profile}/${r.tier} longest frame of all runs (ms), rubric P3`).toBeLessThan(100);
     if (gate === undefined) continue;
-    expect.soft(r.frames, `${r.profile}/${r.tier} frames recorded`).toBeGreaterThan(SECONDS * 20);
-    expect.soft(r.p95Ms, `${r.profile}/${r.tier} p95 frame time (ms)`).toBeLessThanOrEqual(gate);
-    expect.soft(r.maxMs, `${r.profile}/${r.tier} longest frame (ms), rubric P3`).toBeLessThan(100);
+    expect.soft(r.frames, `${r.scene} ${r.profile}/${r.tier} frames recorded`).toBeGreaterThan(SECONDS * 20);
+    expect.soft(r.p95Ms, `${r.scene} ${r.profile}/${r.tier} p95 frame time (ms)`).toBeLessThanOrEqual(gate);
+    expect.soft(r.maxMs, `${r.scene} ${r.profile}/${r.tier} longest frame (ms), rubric P3`).toBeLessThan(100);
   }
 });
 
