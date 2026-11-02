@@ -30,9 +30,11 @@ def sstep(x, a, b):
 
 # ---- regions: weight(P, N) -> 0..1 on vertices; donor = (centre, radius) of a healthy area; cond = texel test
 def w_belly(p, n):
-    if p[2] > 1.20 or n[2] > -0.15:
+    # ventral midline, anterior belly, posterior belly and groin (down-, forward- and backward-facing skin)
+    if p[2] > 1.22 or p[2] < 0.80:
         return 0.0
-    return float(sstep(abs(p[1] + 0.05), 0.80, 0.70) * (1 - sstep(abs(p[0]), 0.09, 0.19)) * sstep(-n[2], 0.15, 0.45))
+    face = max(float(sstep(-n[2], 0.15, 0.45)), 0.8 * float(sstep(abs(n[1]), 0.40, 0.70)))
+    return float(sstep(abs(p[1] + 0.05), 0.90, 0.78) * (1 - sstep(abs(p[0]), 0.12, 0.25)) * face)
 
 
 def w_thigh(p, n):
@@ -68,13 +70,15 @@ EYES = []   # filled from the two small islands
 
 
 def w_brow(p, n):
+    # whole supraorbital lobe above and in front of the eye; the dome above z 2.02 stays as sculpted (smooth by design)
     if not EYES:
         return 0.0
     sx = 1.0 if p[0] > 0 else -1.0
     e = EYES[0] if EYES[0][0] * sx > 0 else EYES[1]
-    c = Vector((e[0], e[1] - 0.02, e[2] + 0.05))
-    d = (Vector(p) - c).length
-    return float(1 - sstep(d, 0.07, 0.12)) * float(sstep(n[2], -0.1, 0.3))
+    c = Vector((e[0] + 0.01 * sx, e[1] + 0.02, e[2] + 0.06))
+    dv = Vector(p) - c
+    d = math.sqrt(dv.x ** 2 + (0.65 * dv.y) ** 2 + dv.z ** 2)     # the lobe runs back along the skull roof: stretch it in y
+    return float(1 - sstep(d, 0.10, 0.17)) * float(sstep(n[2], -0.3, 0.2)) * float(1 - sstep(p[2], 2.00, 2.05))
 
 
 RMEAN = {}
@@ -84,10 +88,10 @@ REGIONS = [
     # name, weight fn, donor centre (x,y,z), donor radius, texel condition on original colour
     ("belly", w_belly, (0.26, 0.05, 1.0), 0.07, None),
     ("thigh", w_thigh, (0.40, -0.05, 0.9), 0.07, None),
-    ("shin", w_shin, (0.40, -0.05, 0.78), 0.09, None),
+    ("shin", w_shin, (0.40, -0.05, 0.9), 0.07, "like-thigh"),
     ("ref", w_ref, (0.40, -0.05, 0.9), 0.07, "ref-only"),
     ("meta", w_meta, (0.40, -0.05, 0.9), 0.07, "all-notone"),
-    ("brow", w_brow, (0.12, -1.25, 1.75), 0.06, "pale"),
+    ("brow", w_brow, (0.12, -1.25, 1.75), 0.06, "lobe"),
 ]
 
 
@@ -145,6 +149,69 @@ def donor_patch(mesh, uv, centre, radius):
     return np.array([x, y], float), np.array([x + sz, y + sz], float), dens, len(tris)
 
 
+def split_mirror(me, uv, verts, norms, eye_verts, planes):
+    """The source UV is mirrored left/right on the belly: both sides sample the same texels, so any repair is an exact
+    mirror image. Give the -x belly faces their own texels: each connected patch of those faces is moved (UV only,
+    geometry untouched) into an empty part of the atlas, and the original texels are copied there first, so the
+    skin looks unchanged until the repair paints different scale texture on the two sides."""
+    wv = np.array([0.0 if i in eye_verts else w_belly(verts[i], norms[i]) for i in range(len(verts))])
+    faces = []
+    for poly in me.polygons:
+        c = sum((verts[i] for i in poly.vertices), Vector()) / 3
+        if c.x < -0.004 and max(wv[i] for i in poly.vertices) > 0.02:
+            faces.append(poly)
+    comps = {}                      # patches of <= 128 px cells so each one fits the free atlas space
+    for poly in faces:
+        cu = sum(uv[l].uv.x for l in poly.loop_indices) / 3 * W
+        cv = sum(uv[l].uv.y for l in poly.loop_indices) / 3 * H
+        comps.setdefault((int(cu // 128), int(cv // 128)), []).append(poly)
+    allt = [np.array([(uv[l].uv.x * W, uv[l].uv.y * H) for l in poly.loop_indices]) for poly in me.polygons]
+    G = cover(allt)
+    Gd = G.copy()
+    for dy in range(-4, 5, 2):
+        for dx in range(-4, 5, 2):
+            Gd |= np.roll(np.roll(G, dy, 0), dx, 1)
+    moved = 0
+    for polys in sorted(comps.values(), key=len, reverse=True):
+        tris = [np.array([(uv[l].uv.x * W, uv[l].uv.y * H) for l in poly.loop_indices]) for poly in polys]
+        M = cover(tris)
+        Md = M.copy()
+        for dy in range(-3, 4):
+            for dx in range(-3, 4):
+                Md |= np.roll(np.roll(M, dy, 0), dx, 1)
+        ys, xs = np.where(Md)
+        if len(ys) == 0:
+            continue
+        y0, y1, x0, x1 = ys.min(), ys.max() + 1, xs.min(), xs.max() + 1
+        crop = Md[y0:y1, x0:x1]
+        best = None
+        for r in range(24, 2000, 24):
+            for k in range(24):
+                a = 2 * math.pi * k / 24
+                dx, dy = int(round(r * math.cos(a))), int(round(r * math.sin(a)))
+                if x0 + dx < 2 or y0 + dy < 2 or x1 + dx > W - 2 or y1 + dy > H - 2:
+                    continue
+                if not (Gd[y0 + dy:y1 + dy, x0 + dx:x1 + dx] & crop).any():
+                    best = (dx, dy)
+                    break
+            if best:
+                break
+        if not best:
+            print("split_mirror: no free atlas space for a patch of", len(polys), "faces; left shared")
+            continue
+        dx, dy = best
+        for arr in planes:
+            sub = arr[y0:y1, x0:x1]
+            dst = arr[y0 + dy:y1 + dy, x0 + dx:x1 + dx]
+            dst[crop] = sub[crop]
+        Gd[y0 + dy:y1 + dy, x0 + dx:x1 + dx] |= crop
+        for poly in polys:
+            for l in poly.loop_indices:
+                uv[l].uv = (uv[l].uv.x + dx / W, uv[l].uv.y + dy / H)
+        moved += len(polys)
+    print("split_mirror: moved", moved, "of", len(faces), "left-belly faces onto their own texels")
+
+
 def tri_wave(x):
     """mirror-repeat of x (in patch units) into [0,1]"""
     x = np.mod(x, 2.0)
@@ -193,6 +260,7 @@ def main():
 
     verts = [v.co for v in me.vertices]
     norms = [v.normal for v in me.vertices]
+    split_mirror(me, uv, verts, norms, eye_verts, (bc0, bc, nm0, nm))
     for name, wf, dc, dr, cond in REGIONS:
         wv = np.array([0.0 if i in eye_verts else wf(verts[i], norms[i]) for i in range(len(verts))])
         print(name, "verts weighted", int((wv > 0.01).sum()))
@@ -270,9 +338,12 @@ def main():
                 wa = (tent(fu) * tent(fv))[:, None]               # cross-fade the two tilings so no tile edge shows
                 dcolx = (bc0[dyA, dxA, :3] * wa + bc0[dyB, dxB, :3] * (1 - wa)) * tone
                 al = wt.copy()
-                if cond in ("pale", "pale-notone"):
+                if cond in ("pale", "pale-notone", "lobe"):
                     lum = orig @ np.array([0.3, 0.55, 0.15])
-                    al *= sstep(lum, 0.22, 0.34) if cond == "pale" else sstep(lum, 0.46, 0.54)
+                    if cond == "lobe":      # every skin texel of the lobe; dark grey-blue node texels (lum < 0.27) are excluded
+                        al *= sstep(lum, 0.27, 0.34)
+                    else:
+                        al *= sstep(lum, 0.22, 0.34) if cond == "pale" else sstep(lum, 0.46, 0.54)
                 al = np.clip(al, 0, 1)[:, None]
                 cur = bc[ty, tx, :3]              # mix over the current result so regions that overlap do not undo each other
                 bc[ty, tx, :3] = cur * (1 - al) + np.clip(dcolx, 0, 1) * al
@@ -309,10 +380,10 @@ def main():
                 RMEAN[name] = rmean
                 if cond == "pale-notone":
                     tone = np.ones(3)
+                if cond == "like-thigh":      # same donor and tone as the thigh and the patch below: one continuous skin
+                    tone = np.clip(RMEAN["thigh"] / np.maximum(dmean, 1e-3), 0.7, 1.4)
                 if cond == "all-notone":           # donor is the dark mottled thigh skin that continues above the patch
-                    # darken the donor to the luminance of the dark skin that surrounds the pale patch (measured 0.27-0.33)
-                    lum_d = float(dmean @ np.array([0.3, 0.55, 0.15]))
-                    tone = np.full(3, float(np.clip(0.30 / max(lum_d, 1e-3), 0.4, 1.0)))
+                                        tone = np.clip(RMEAN["thigh"] / np.maximum(dmean, 1e-3), 0.7, 1.4)   # same colour as the thigh skin above
                 print(name, "tone", tone)
     base.pixels.foreach_set(bc.ravel()); base.pack()
     nrm.pixels.foreach_set(nm.ravel()); nrm.pack()
