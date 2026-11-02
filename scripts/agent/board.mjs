@@ -19,10 +19,13 @@ const COMMANDS = {
   lock: 'Take the single-orchestrator lock (fails if another live session holds it)',
   heartbeat: 'Refresh the orchestrator lock',
   unlock: 'Release the orchestrator lock',
+  'gpu-lock': 'gpu-lock <issue>  Take the shared GPU lock (fails if another issue holds it)',
+  'gpu-heartbeat': 'gpu-heartbeat <issue>  Refresh the GPU lock during long perf runs',
+  'gpu-unlock': 'gpu-unlock <issue>  Release the GPU lock (only if you hold it)',
 };
 
 function usage() {
-  return ['Usage: node scripts/agent/board.mjs <command> [args] [--pretty]', '', ...Object.entries(COMMANDS).map(([c, d]) => `  ${c.padEnd(11)} ${d}`)].join('\n');
+  return ['Usage: node scripts/agent/board.mjs <command> [args] [--pretty]', '', ...Object.entries(COMMANDS).map(([c, d]) => `  ${c.padEnd(14)} ${d}`)].join('\n');
 }
 
 async function main() {
@@ -39,6 +42,25 @@ async function main() {
       next: { type: 'string' }, reason: { type: 'string' }, pretty: { type: 'boolean' },
     },
   });
+  if (command.startsWith('gpu-')) {
+    const issue = Number(positionals[0]);
+    if (!Number.isInteger(issue) || issue <= 0) throw new Error(`${command} needs an issue number`);
+    const { acquireLock, heartbeat, releaseLock, gpuLockPath } = await import('./lib/lock.mjs');
+    const path = gpuLockPath();
+    let result;
+    if (command === 'gpu-lock') {
+      const r = acquireLock(path, Date.now(), issue);
+      result = r.ok ? { ok: true } : { ok: false, error: 'GPU lock held by another issue', holder: r.holder };
+    } else if (command === 'gpu-heartbeat') {
+      heartbeat(path, Date.now(), issue);
+      result = { ok: true };
+    } else {
+      result = releaseLock(path, issue);
+    }
+    console.log(JSON.stringify(result));
+    if (!result.ok) process.exit(1);
+    return;
+  }
   const { commands } = await import('./lib/commands.mjs');
   const result = await commands[command]({ args: positionals, opts: values });
   console.log(values.pretty ? JSON.stringify(result, null, 2) : JSON.stringify(result));
