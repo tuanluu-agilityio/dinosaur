@@ -32,7 +32,8 @@ Repeat until `ready` returns nothing and nothing is running. Run `heartbeat` at 
    - Else dispatch subagent `A` **in the background** with: issue number, worktree path, "read your issue with `gh issue view <n>`", the checkpoint `next` if resuming, reviewer comments if reworking, and `<root>/.env` path for tasks that download assets. Keep it short — the issue is the brief.
 3. Subagent reports `STATUS: DONE` → `git push -u origin task/<n>-<slug>` from the worktree. If `gh pr list --head task/<n>-<slug> --state open` is empty, `gh pr create` (title = commit header; body `Closes #<n>`, summary, the **evidence URLs from the report**, `🤖 Generated with [Claude Code](https://claude.com/claude-code)`); otherwise add a PR comment summarising the rework. `move <n> Review`, then §5.
    `BLOCKED` / `NEEDS_CONTEXT` → if you can supply what is missing, re-dispatch **once** with it. A second BLOCKED on the same attempt → §6.
-4. Subagents never open/merge PRs or move cards; they only `checkpoint`.
+4. **GPU lock:** workers must hold it around any frame-time measurement or perf e2e run: `board.mjs gpu-lock <n>` (if `ok:false`, wait and retry), `gpu-heartbeat <n>` during long runs, `gpu-unlock <n>` afterwards. Say so in the dispatch of `perf`, `scene` and `dino` tasks. Stale locks (30 min) are taken over.
+5. Subagents never open/merge PRs or move cards; they only `checkpoint`.
 
 ## 5. Review
 Ensure `.worktrees/task-<n>` exists (§3.2 rule). Dispatch reviewers (read-only, in parallel) with the issue number, PR number, worktree path and `<root>`, by the issue's `area:` label:
@@ -47,6 +48,8 @@ Ensure `.worktrees/task-<n>` exists (§3.2 rule). Dispatch reviewers (read-only,
 4. `move <n> Done`; `git pull --ff-only` on main.
 
 **Any CHANGES** → one PR comment with all reviewers' lists, then `move <n> "In Progress"` and read `attempt` from its output. If `attempt > 3` → §6. Else re-dispatch the same agent with that comment.
+- **Cosmetic-only stop:** when `attempt >= 2` and every remaining CHANGES item is cosmetic (visual polish; no rubric red flag, correctness, perf or licence issue), do not re-dispatch. Ask the user to choose between another round and "accept + known issue" (§6 records the KI row).
+- **Re-review rounds:** if the previous reviewer's reported `subagent_tokens` is over 120k, dispatch a fresh reviewer instead of resuming it. Give it only the issue number, the PR number, the latest review comment and the diff since the last reviewed commit.
 
 ## 6. Failure
 `fail <n> --reason "<why>"` (frees the slot, labels `needs-human`). Record it: create an issue "Known issue: <summary>" (label `known-issue`; body lists the only file it may change: `docs/known-issues.md`), add it to the board, and handle it like any task — branch, add the row to `docs/known-issues.md`, PR, `code-reviewer`, merge. Continue with other tasks.

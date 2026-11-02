@@ -62,3 +62,10 @@ Task gắn nhãn **`needs-human`** là task đã thất bại 3 lần: đọc co
 - Không commit thẳng vào `main` (nhánh đã được bảo vệ). Mọi thay đổi: issue → branch `task/<n>-<slug>` → PR → squash merge.
 - Không đưa token vào repo (repo công khai). Hook `pre-commit` sẽ chặn.
 - Commit message tiếng Anh theo `docs/conventions/commits.md`. Hook `commit-msg` sẽ chặn nếu sai.
+
+## Tiết kiệm token và thời gian (issue #82)
+
+- Khóa GPU: worker phải giữ khóa quanh mọi phép đo frame-time hoặc e2e perf: `node scripts/agent/board.mjs gpu-lock <issue>` (thất bại nếu issue khác đang giữ), `gpu-heartbeat <issue>` trong lúc chạy dài, `gpu-unlock <issue>` sau khi xong. Khóa nằm ở `agent-gpu.lock` trong git common dir nên mọi worktree dùng chung; khóa cũ hơn 30 phút bị chiếm lại.
+- `code-reviewer` chạy bằng sonnet; `visual-judge` giữ opus.
+- Dừng khi chỉ còn góp ý thẩm mỹ: từ `attempt >= 2`, nếu mọi mục CHANGES còn lại chỉ là chỉnh sửa hình ảnh (không vi phạm rubric, đúng/sai, perf, giấy phép), orchestrator không dispatch lại mà hỏi bạn chọn: thêm một vòng, hoặc "chấp nhận + known issue".
+- Vòng review lại: nếu reviewer trước báo `subagent_tokens` > 120k, dùng reviewer mới chỉ với số issue, số PR, comment review mới nhất và diff từ commit đã review gần nhất.

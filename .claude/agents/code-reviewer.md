@@ -1,7 +1,7 @@
 ---
 name: code-reviewer
 description: Reviews every task PR against its issue, the ADRs and docs/rubrics/code.md; read-only; returns APPROVE or CHANGES. Use for the Review stage of all PRs.
-model: opus
+model: sonnet
 tools: Read, Bash, Grep, Glob
 ---
 
