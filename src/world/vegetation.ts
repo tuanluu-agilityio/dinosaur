@@ -52,8 +52,13 @@ interface Spec {
   /** Enclosing spheres at scale 1: [height of centre above the trunk base, radius], sway margin included. Tested with isClearOfIntro. */
   spheres: Array<[number, number]>;
 }
-/** Conifer: three spheres enclose the crown (branches span 8-25 m, reach <= 4.6 m, +0.9 m sway margin) and a fourth the buttressed base. */
+/**
+ * Conifer: three spheres enclose the crown skirts and the near spray limbs (8.5-26 m), and a fourth the buttressed base.
+ * Spray limbs are shortened at build time until every vertex plus its maximum sway (CONIFER_SWAY x bend) lies inside them.
+ */
 const CONIFER_SPHERES: Array<[number, number]> = [[24, 5.5], [17, 5.5], [10, 5.5], [1.6, 2.6]];
+/** Conifer wind strength (m at bend 1) times the largest per-plant gain. */
+const CONIFER_SWAY = 1.8 * 1.45;
 const SPECS: Record<Species, Spec> = {
   conifer: { radius: 7, scale: [0.75, 1.15], xz: [0.8, 1.2], spheres: CONIFER_SPHERES },
   cycad: { radius: 3.2, scale: [0.8, 1.3], xz: [0.9, 1.1], spheres: [[3.2, 3.3]] },
@@ -191,6 +196,18 @@ class Mesher {
       }
       if (s < segs) { const b = first + s * 2; this.idx.push(b, b + 1, b + 2, b + 1, b + 3, b + 2); }
     }
+  }
+  mark(): [number, number] { return [this.pos.length / 3, this.idx.length]; }
+  reset([v, i]: [number, number]): void {
+    this.pos.length = this.nrm.length = v * 3; this.uvs.length = v * 2; this.bend.length = this.part.length = v; this.idx.length = i;
+  }
+  /** True when every vertex added since `mark`, displaced by `sway` x its bend weight, lies inside one of the spheres. */
+  inside([v]: [number, number], spheres: Array<[number, number]>, sway: number): boolean {
+    for (let i = v; i < this.pos.length / 3; i++) {
+      const x = this.pos[3 * i], y = this.pos[3 * i + 1], z = this.pos[3 * i + 2], d = this.bend[i] * sway;
+      if (!spheres.some(([h, r]) => Math.hypot(x, y - h, z) + d <= r)) return false;
+    }
+    return true;
   }
   /** Open tapered cylinder (trunk piece). */
   tube(y0: number, y1: number, r0: number, r1: number, sides: number, part: number, bend0: number, bend1: number): void {
@@ -336,20 +353,30 @@ export function coniferSprayGeometry(): BufferGeometry {
     const t = i / (limbs - 1);
     const y0 = CROWN_BASE + 0.3 + t * (H - CROWN_BASE - 1.3) + (rand() - 0.5) * 0.5;
     const yaw = i * 2.399 + (rand() - 0.5) * 0.7;
-    const L = Math.min(4.2, crownRadius(y0) * (0.95 + rand() * 0.15) + 0.2);
+    const L0 = Math.min(4.2, crownRadius(y0) * (0.95 + rand() * 0.15) + 0.2);
+    const sprayRand = Array.from({ length: 16 }, () => rand());
     const rise = 0.1, droop = 0.4;
     const r0 = 0.3 * (1 - 0.88 * (y0 / H));
     const dx = Math.cos(yaw), dz = Math.sin(yaw);
     const b0 = trunkBend(y0);
-    m.frond(dx * r0, y0, dz * r0, yaw, L, 0.05, rise, droop, 2, 0, 0.5, false, b0, 0.15); // twig (part 0.5: bark colour, lit from above)
-    const at = (s: number) => ({ x: dx * (r0 + L * s), y: y0 + L * (rise * s - droop * s * s), z: dz * (r0 + L * s) });
-    for (const s of [0.45, 0.65, 0.85]) {
-      const p = at(s);
-      const len = (1.3 - 0.3 * s) * (0.8 + rand() * 0.4) * Math.min(1, 0.45 + L / 3);
-      for (const side of [-1, 1]) m.frond(p.x, p.y, p.z, yaw + side * (0.95 + rand() * 0.3), len, 0.3 * len, 0.1, 0.5, 2, 0.15 + rand() * 0.5, 1, true, b0, 0.25);
+    // Shorten the limb (and its sprays) until every vertex, swayed by its maximum wind offset, stays inside the intro
+    // clearance spheres (CONIFER_SPHERES), so the camera contract holds for the near detail too.
+    for (let k = 1; ; k *= 0.92) {
+      const mark = m.mark();
+      const L = L0 * k;
+      let r = 0;
+      m.frond(dx * r0, y0, dz * r0, yaw, L, 0.05, rise, droop, 2, 0, 0.5, false, b0, 0.15); // twig (part 0.5: bark colour, lit from above)
+      const at = (s: number) => ({ x: dx * (r0 + L * s), y: y0 + L * (rise * s - droop * s * s), z: dz * (r0 + L * s) });
+      for (const s of [0.45, 0.65, 0.85]) {
+        const p = at(s);
+        const len = (1.3 - 0.3 * s) * (0.8 + sprayRand[r++] * 0.4) * Math.min(1, 0.45 + L / 3) * k;
+        for (const side of [-1, 1]) m.frond(p.x, p.y, p.z, yaw + side * (0.95 + sprayRand[r++] * 0.3), len, 0.3 * len, 0.1, 0.5, 2, 0.15 + sprayRand[r++] * 0.5, 1, true, b0, 0.25);
+      }
+      const tip = at(1);
+      m.frond(tip.x, tip.y, tip.z, yaw + (sprayRand[15] - 0.5) * 0.4, 1.1 * k, 0.3 * k, 0.1, 0.5, 2, 0.2, 1, true, b0, 0.25);
+      if (k < 0.3 || m.inside(mark, CONIFER_SPHERES, CONIFER_SWAY)) break;
+      m.reset(mark);
     }
-    const tip = at(1);
-    m.frond(tip.x, tip.y, tip.z, yaw + (rand() - 0.5) * 0.4, 1.1, 0.3, 0.1, 0.5, 2, 0.2, 1, true, b0, 0.25);
   }
   return m.build();
 }
@@ -734,6 +761,8 @@ export function createVegetation(tier: QualityTier, seed?: number, want?: Record
     },
     dispose() {
       group.removeFromParent();
+      for (const sp of ORDER) for (const m of meshes[sp]) m.dispose(); // frees the instance matrix buffers
+      for (const m of sprays) m.dispose();
       for (const g of owned) g.dispose();
       for (const sp of ORDER) { defs[sp].geo.dispose(); defs[sp].mat.dispose(); }
       sprayGeo.dispose(); sprayMat.dispose();

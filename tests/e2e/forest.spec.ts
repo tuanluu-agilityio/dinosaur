@@ -98,3 +98,23 @@ test('tier switch only removes plants and fades them out', async ({ page }) => {
   expect(await total()).toBe(r.low);
   expect(errors).toEqual([]);
 });
+
+test('conifer crown and spray limbs stay inside the intro clearance spheres, sway included', async ({ page }) => {
+  await page.goto('/dinosaur/');
+  const worst = await page.evaluate(async () => {
+    const mod = '/dinosaur/src/world/vegetation.ts';
+    const v = await import(/* @vite-ignore */ mod);
+    const spheres = [[24, 5.5], [17, 5.5], [10, 5.5], [1.6, 2.6]];
+    let w = -1e9;
+    for (const g of [v.coniferGeometry(), v.coniferSprayGeometry()]) {
+      const p = g.attributes.position.array, b = g.attributes.bend.array;
+      for (let i = 0; i < p.length / 3; i++) {
+        const sway = b[i] * 1.8 * 1.45; // wind strength x largest per-plant gain
+        w = Math.max(w, Math.min(...spheres.map(([h, r]) => Math.hypot(p[3 * i], p[3 * i + 1] - h, p[3 * i + 2]) + sway - r)));
+      }
+    }
+    return w;
+  });
+  expect(Number.isFinite(worst)).toBe(true);
+  expect(worst).toBeLessThanOrEqual(0);
+});
