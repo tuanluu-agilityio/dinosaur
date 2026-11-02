@@ -11,7 +11,8 @@ const read = (path) => (existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')
 
 export function acquireLock(path, now = Date.now(), owner) {
   const holder = read(path);
-  if (holder && now - holder.heartbeat <= STALE_MS) return { ok: false, holder };
+  const mine = holder && owner !== undefined && holder.owner === owner;
+  if (holder && !mine && now - holder.heartbeat <= STALE_MS) return { ok: false, holder };
   writeFileSync(path, JSON.stringify({ pid: process.pid, startedAt: now, heartbeat: now, ...(owner === undefined ? {} : { owner }) }));
   return { ok: true };
 }

@@ -1,7 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { mkdtempSync, existsSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { realpathSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { acquireLock, heartbeat, releaseLock, gpuLockPath } from '../../scripts/agent/lib/lock.mjs';
 
 let path;
@@ -62,11 +64,30 @@ describe('lock', () => {
       expect(acquireLock(path, 31 * MIN, 6).ok).toBe(true);
     });
 
-    it('shares one path across worktrees via the git common dir', () => {
-      const a = gpuLockPath(process.cwd());
-      const b = gpuLockPath(join(process.cwd(), 'tests'));
-      expect(a).toBe(b);
-      expect(a.endsWith('agent-gpu.lock')).toBe(true);
+    it('re-acquire by the same issue succeeds and refreshes the heartbeat', () => {
+      acquireLock(path, 0, 5);
+      expect(acquireLock(path, 20 * MIN, 5).ok).toBe(true);
+      expect(acquireLock(path, 45 * MIN, 6).ok).toBe(false);
+    });
+
+    it('heartbeat reports ok only for the holder', () => {
+      expect(heartbeat(path, 0, 5).ok).toBe(false);
+      acquireLock(path, 0, 5);
+      const r = heartbeat(path, MIN, 6);
+      expect(r.ok).toBe(false);
+      expect(r.holder.owner).toBe(5);
+      expect(heartbeat(path, MIN, 5).ok).toBe(true);
+    });
+
+    it('shares one path across a linked worktree', () => {
+      const dir = mkdtempSync(join(tmpdir(), 'wt-'));
+      const git = (cwd, ...a) => execFileSync('git', a, { cwd, encoding: 'utf8' });
+      git(dir, 'init', '-q');
+      git(dir, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '--allow-empty', '-m', 'x');
+      const wt = join(dir, 'wt');
+      git(dir, 'worktree', 'add', '-q', wt, '-b', 'b');
+      expect(gpuLockPath(wt)).toBe(gpuLockPath(dir));
+      expect(realpathSync(dirname(gpuLockPath(wt)))).toBe(realpathSync(join(dir, '.git')));
     });
   });
 });
