@@ -1,7 +1,8 @@
 // Composes the whole experience: renderer, world, atmosphere, dinosaurs, camera director, panel, narration and ambient audio.
 import { Scene, PerspectiveCamera, Vector2, Vector3, ACESFilmicToneMapping } from 'three/webgpu';
 import { createRenderer, startLoop } from '../core/renderer';
-import { detectTier, readDeviceCaps, FpsGovernor, type QualityTier } from '../core/quality';
+import { detectTier, readDeviceCaps, type QualityTier } from '../core/quality';
+import { QualityRuntime, installQualityProbe, qualityParams } from './quality-runtime';
 import { createTerrain } from '../world/terrain';
 import { createVegetation, type Vegetation } from '../world/vegetation';
 import { Atmosphere } from '../world/atmosphere';
@@ -91,11 +92,8 @@ export async function createApp(canvas: HTMLCanvasElement): Promise<void> {
     const { renderer, isWebGPU } = await createRenderer(canvas);
     renderer.toneMapping = ACESFilmicToneMapping;
     configureDinoLoader(renderer);
-    const forced = q.get('tier');
-    let tier: QualityTier = forced === 'low' || forced === 'medium' || forced === 'high'
-      ? forced
-      : detectTier({ ...readDeviceCaps(), webgpu: isWebGPU });
-    const governor = new FpsGovernor({ downgradeBelow: 28, windowSec: 3, startTier: tier });
+    const qp = qualityParams(location.search);
+    let tier: QualityTier = qp.tier ?? detectTier({ ...readDeviceCaps(), webgpu: isWebGPU });
 
     const scene = new Scene();
     const camera = new PerspectiveCamera(50, 1, 0.1, 400);
@@ -129,6 +127,11 @@ export async function createApp(canvas: HTMLCanvasElement): Promise<void> {
     }
 
     const director = new CameraDirector(camera, canvas);
+    const quality = new QualityRuntime({
+      renderer, isWebGPU, tier, director, scene, camera, atmosphere, vegetation: vegetation ?? undefined,
+      governor: qp.governor ? { downgradeBelow: 28, windowSec: 3 } : false,
+    });
+    const probe = DEV || q.has('test') ? installQualityProbe(quality, renderer) : null;
     const panel = new InfoPanel(ui);
     const controls = new Controls(ui);
     new Credits(ui);
@@ -239,13 +242,9 @@ export async function createApp(canvas: HTMLCanvasElement): Promise<void> {
       director.update(dt);
       atmosphere.update(camera, dt);
       vegetation?.update(dt, camera);
-      const next = governor.sample(dt * 1000);
-      if (next) {
-        tier = next;
-        atmosphere.setTier(next);
-        vegetation?.setTier(next);
-        showOverlay();
-      }
+      probe?.frame();
+      quality.update(dt);
+      if (quality.tier !== tier) { tier = quality.tier; showOverlay(); }
       renderer.render(scene, camera);
     });
 
