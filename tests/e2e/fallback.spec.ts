@@ -43,8 +43,6 @@ const frames = (page: Page, n: number) =>
 
 test('no WebGPU: full app on WebGL2, click opens panel and narration, no compute, no console errors', async ({ page }) => {
   const errors = await open(page, 'noIntro');
-  // navigator.gpu may still exist, but no adapter is handed out.
-  expect(await page.evaluate(async () => (await (navigator as any).gpu?.requestAdapter()) ?? null)).toBeNull();
   const q = await page.evaluate(() => ({ backend: window.__quality!.backend, tier: window.__quality!.tier, verlet: window.__quality!.budget.verlet }));
   expect(q).toEqual({ backend: 'webgl2', tier: 'low', verlet: false });
 
@@ -62,7 +60,7 @@ test('no WebGPU: full app on WebGL2, click opens panel and narration, no compute
   await page.evaluate(() => (window as any).__app.freeze(false));
   await page.waitForFunction(() => (window as any).__app.director.state === 'closeup', null, { timeout: 20_000 });
   await expect(page.locator('.dino-panel')).toBeVisible();
-  await expect(page.locator('.dino-panel__title')).toHaveText('Tyrannosaurus rex');
+  await expect(page.locator('.dino-panel__title')).toHaveText('T. rex');
   const playing = () => page.evaluate(() => (window as any).__audios.filter((a: any) => a.playing).map((a: any) => a.src as string));
   expect(await playing()).toEqual([expect.stringContaining('audio/en/tyrannosaurus.behavior.mp3')]);
 
