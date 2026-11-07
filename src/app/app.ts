@@ -1,0 +1,274 @@
+// Composes the whole experience: renderer, world, atmosphere, dinosaurs, camera director, panel, narration and ambient audio.
+import { Scene, PerspectiveCamera, Vector2, Vector3, ACESFilmicToneMapping } from 'three/webgpu';
+import { createRenderer, startLoop } from '../core/renderer';
+import { detectTier, readDeviceCaps, FpsGovernor, type QualityTier } from '../core/quality';
+import { createTerrain } from '../world/terrain';
+import { createVegetation, type Vegetation } from '../world/vegetation';
+import { Atmosphere } from '../world/atmosphere';
+import { Dino, configureDinoLoader } from '../dinos/dino';
+import { DinoWorld } from '../dinos/world';
+import { CameraDirector } from '../camera/director';
+import { InfoPanel } from '../ui/panel';
+import { Controls } from '../ui/controls';
+import { Credits } from '../ui/credits';
+import { Narrator } from '../audio/narrator';
+import { validateManifest } from '../assets/manifest';
+import { loadSpecies } from '../content/load';
+import type { SpeciesContent, SpeciesId } from '../content/schema';
+import { getLang, onLangChange, t } from '../i18n/i18n';
+import manifestJson from '../../assets/manifest.json';
+
+type Section = keyof SpeciesContent['sections'];
+const BASE: string = (import.meta as { env?: { BASE_URL?: string } }).env?.BASE_URL ?? '/';
+const DEV: boolean = (import.meta as { env?: { DEV?: boolean } }).env?.DEV === true;
+const CLICK_SLOP = 6; // px a pointer may move and still count as a click
+
+function div(cls: string, parent: HTMLElement): HTMLDivElement {
+  const d = document.createElement('div');
+  d.className = cls;
+  parent.appendChild(d);
+  return d;
+}
+
+function injectStyle(): void {
+  const s = document.createElement('style');
+  s.textContent = `
+    .dino-label { position: fixed; left: 0; top: 0; display: none; pointer-events: none; z-index: 25; padding: 4px 8px; border-radius: 4px;
+      background: rgba(10,14,10,.78); color: #f1efe4; font: 14px/1.2 system-ui, sans-serif; }
+    .dino-hint { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 15; padding: 8px 14px; border-radius: 8px;
+      background: rgba(10,14,10,.7); color: #f1efe4; font: 15px/1.3 system-ui, sans-serif; pointer-events: none; }
+    .dino-hint[hidden], .dino-status[hidden] { display: none; }
+    .dino-status { position: fixed; inset: 0; z-index: 40; display: grid; place-content: center; gap: 12px; text-align: center;
+      background: #0b0f0c; color: #e8efe6; font: 16px/1.4 system-ui, sans-serif; }
+    .dino-status button { font: 600 14px system-ui; padding: 10px 16px; border-radius: 8px; cursor: pointer; }`;
+  document.head.appendChild(s);
+}
+
+/** Looping forest ambience; starts on the first user gesture (autoplay policy). */
+class Ambient {
+  private readonly el = document.createElement('audio');
+  private started = false;
+  constructor() {
+    const ogg = this.el.canPlayType('audio/ogg; codecs="vorbis"') !== '';
+    this.el.src = `${BASE}audio/ambient/forest-night.${ogg ? 'ogg' : 'm4a'}`;
+    this.el.loop = true;
+    this.el.volume = 0.5;
+    const go = (): void => {
+      removeEventListener('pointerdown', go);
+      removeEventListener('keydown', go);
+      this.started = true;
+      this.el.play().catch(() => { /* blocked or missing: ambience is optional */ });
+    };
+    addEventListener('pointerdown', go);
+    addEventListener('keydown', go);
+  }
+  setMuted(m: boolean): void {
+    this.el.muted = m;
+    if (this.started && !m && this.el.paused) this.el.play().catch(() => { /* optional */ });
+  }
+}
+
+export async function createApp(canvas: HTMLCanvasElement): Promise<void> {
+  const q = new URLSearchParams(location.search);
+  injectStyle();
+  const ui = document.body;
+
+  const status = div('dino-status', ui);
+  status.textContent = '…';
+  const fail = (e: unknown): void => {
+    console.error(e);
+    status.replaceChildren();
+    const msg = document.createElement('p');
+    msg.textContent = t('loadError');
+    const retry = document.createElement('button');
+    retry.textContent = t('retry');
+    retry.addEventListener('click', () => location.reload());
+    status.append(msg, retry);
+    status.hidden = false;
+  };
+
+  try {
+    const { renderer, isWebGPU } = await createRenderer(canvas);
+    renderer.toneMapping = ACESFilmicToneMapping;
+    configureDinoLoader(renderer);
+    const forced = q.get('tier');
+    let tier: QualityTier = forced === 'low' || forced === 'medium' || forced === 'high'
+      ? forced
+      : detectTier({ ...readDeviceCaps(), webgpu: isWebGPU });
+    const governor = new FpsGovernor({ downgradeBelow: 28, windowSec: 3, startTier: tier });
+
+    const scene = new Scene();
+    const camera = new PerspectiveCamera(50, 1, 0.1, 400);
+    const atmosphere = new Atmosphere(scene, renderer, { tier, isWebGPU });
+    scene.add(createTerrain().group);
+    let vegetation: Vegetation | null = null;
+    if (!q.has('noveg')) { vegetation = createVegetation(tier); scene.add(vegetation.group); }
+
+    // Dinosaurs: every approved manifest entry; a herd for triceratops, the rest solo.
+    const manifest = validateManifest(manifestJson).filter((e) => e.status === 'approved');
+    const species = new Map<SpeciesId, SpeciesContent>();
+    await Promise.all(manifest.map(async (e) => { species.set(e.species, await loadSpecies(e.species)); }));
+    const world = new DinoWorld(scene);
+    const label = div('dino-label', ui);
+    world.label = label;
+    world.commonName = (id) => species.get(id)?.commonName[getLang()] ?? id;
+    const shadowIdx = new Map<Dino, number>();
+    world.onDinoMoved = (d, x, y, z) => {
+      const r = d.focusRadius * 0.28;
+      const yaw = d.root.rotation.y - Math.PI / 2;
+      const i = shadowIdx.get(d);
+      if (i === undefined) shadowIdx.set(d, atmosphere.contactShadows.add(x, y, z, r, 3, yaw));
+      else atmosphere.contactShadows.set(i, x, y, z, r, 3, yaw);
+    };
+    for (const e of manifest) {
+      const n = e.species === 'triceratops' ? 3 : 1;
+      for (let i = 0; i < n; i++) {
+        const behaviour = e.species === 'triceratops' ? 'herd' : e.species === 'tyrannosaurus' ? 'wander' : 'graze';
+        world.add(await Dino.load(e, tier), behaviour);
+      }
+    }
+
+    const director = new CameraDirector(camera, canvas);
+    const panel = new InfoPanel(ui);
+    const controls = new Controls(ui);
+    new Credits(ui);
+    const narrator = new Narrator();
+    const ambient = new Ambient();
+    const hint = div('dino-hint', ui);
+    const hintText = (): void => { hint.textContent = t('clickHint'); };
+    hintText();
+
+    let selected: Dino | null = null;
+    let section: Section = 'behavior';
+    let pendingBack = false;
+    let frozen = false;
+
+    const narrate = (): void => {
+      if (!selected) return;
+      narrator.play(selected.id, getLang(), section).catch((e) => console.warn(String(e)));
+    };
+    const updateHint = (): void => { hint.hidden = director.state !== 'forest' || selected !== null; };
+
+    narrator.setMuted(controls.isMuted);
+    ambient.setMuted(controls.isMuted);
+    controls.onMute((m) => { narrator.setMuted(m); ambient.setMuted(m); if (!m) narrate(); });
+
+    const back = async (): Promise<void> => {
+      const d = selected;
+      if (!d) return;
+      if (director.state === 'flying') { pendingBack = true; return; } // leave once the flight lands
+      narrator.stop();
+      panel.hide();
+      selected = null;
+      pendingBack = false;
+      updateHint();
+      await director.returnToForest();
+      world.setPaused(d, false);
+      updateHint();
+    };
+
+    const select = async (d: Dino): Promise<void> => {
+      const content = species.get(d.id);
+      if (!content) return;
+      selected = d;
+      section = 'behavior';
+      pendingBack = false;
+      label.style.display = 'none';
+      world.setPaused(d, true);
+      panel.show(content, getLang());
+      narrate();
+      updateHint();
+      await director.focus(d.proxy, d.focusRadius);
+      if (pendingBack) await back();
+    };
+
+    panel.onBack(() => { void back(); });
+    panel.onSection((s) => { section = s; narrate(); });
+    onLangChange((l) => {
+      hintText();
+      const c = selected && species.get(selected.id);
+      if (c) { panel.show(c, l); narrate(); } // same section, new language; Narrator.play stops the old track first
+    });
+
+    // Pointer: hover label and click-to-select only in the forest state; a drag (look around) is not a click.
+    const ndc = new Vector2();
+    const setNdc = (ev: PointerEvent): Vector2 => ndc.set((ev.clientX / innerWidth) * 2 - 1, -(ev.clientY / innerHeight) * 2 + 1);
+    let down: { x: number; y: number } | null = null;
+    canvas.addEventListener('pointerdown', (ev) => { down = { x: ev.clientX, y: ev.clientY }; });
+    canvas.addEventListener('pointermove', (ev) => {
+      if (director.state !== 'forest' || selected) { label.style.display = 'none'; return; }
+      world.hover(setNdc(ev), camera, ev.clientX, ev.clientY);
+    });
+    canvas.addEventListener('pointerup', (ev) => {
+      const start = down;
+      down = null;
+      if (!start || Math.hypot(ev.clientX - start.x, ev.clientY - start.y) > CLICK_SLOP) return;
+      if (director.state !== 'forest' || selected) return; // ignored while flying or already in a close-up
+      const hit = world.pick(setNdc(ev), camera);
+      if (hit) void select(hit);
+    });
+
+    const resize = (): void => {
+      renderer.setSize(innerWidth, innerHeight, false);
+      camera.aspect = innerWidth / innerHeight;
+      camera.fov = camera.aspect < 1 ? 70 : 50;
+      camera.updateProjectionMatrix();
+    };
+    addEventListener('resize', resize);
+    resize();
+
+    const overlay = document.getElementById('dev-overlay');
+    const showOverlay = (): void => {
+      if (!overlay || (!DEV && !location.pathname.includes('/dev/'))) return;
+      overlay.hidden = false;
+      overlay.textContent = `tier: ${tier} | backend: ${isWebGPU ? 'webgpu' : 'webgl2'}`;
+    };
+    showOverlay();
+
+    const introDone = director.playIntro();
+    if (q.has('noIntro')) director.skipIntro();
+    else { controls.showSkipIntro(true); controls.onSkipIntro(() => director.skipIntro()); }
+    void introDone.then(() => { controls.showSkipIntro(false); updateHint(); });
+    // Pre-compile pipelines, but never block start-up on it (some software backends never report completion).
+    await Promise.race([renderer.compileAsync(scene, camera), new Promise((r) => setTimeout(r, 15000))]);
+
+    let simClock = 0;
+    startLoop((dt) => {
+      simClock += dt;
+      if (!frozen) world.update(dt);
+      director.update(dt);
+      atmosphere.update(camera, dt);
+      vegetation?.update(dt, camera);
+      const next = governor.sample(dt * 1000);
+      if (next) {
+        tier = next;
+        atmosphere.setTier(next);
+        vegetation?.setTier(next);
+        showOverlay();
+      }
+      renderer.render(scene, camera);
+    });
+
+    status.hidden = true;
+    if (DEV || q.has('test')) {
+      const v = new Vector3();
+      const find = (id: SpeciesId): Dino => world.dinos.find((d) => d.id === id)!;
+      (window as unknown as Record<string, unknown>).__app = {
+        director, camera, world, narrator,
+        get selected() { return selected?.id ?? null; },
+        get tier() { return tier; },
+        get simClock() { return simClock; },
+        freeze(f: boolean) { frozen = f; },
+        /** Aim the forest camera straight at a dinosaur (test/evidence aid). */
+        lookAt(id: SpeciesId) { camera.lookAt(find(id).proxy.getWorldPosition(v)); camera.updateMatrixWorld(true); },
+        screenOf(id: SpeciesId) {
+          const p = find(id).proxy.getWorldPosition(v.set(0, 0, 0)).project(camera);
+          return { x: ((p.x + 1) / 2) * innerWidth, y: ((1 - p.y) / 2) * innerHeight };
+        },
+      };
+    }
+    document.documentElement.dataset.ready = '1';
+  } catch (e) {
+    fail(e);
+  }
+}
