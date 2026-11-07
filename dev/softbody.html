@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Secondary motion (GPU Verlet) dev page</title>
+    <style>
+      html, body { margin: 0; height: 100%; background: #0b0f0c; overflow: hidden; }
+      canvas { display: block; width: 100%; height: 100%; }
+      #hud { position: fixed; left: 8px; top: 8px; padding: 4px 8px; border-radius: 4px; pointer-events: none;
+        background: rgba(10, 14, 10, 0.7); color: #f1efe4; font: 14px/1.3 system-ui, sans-serif; }
+    </style>
+  </head>
+  <body>
+    <canvas id="scene"></canvas>
+    <div id="hud"></div>
+    <script type="module">
+      // Experiment page for issue #34 (ADR 0011).
+      // Params: tier=low|medium|high; softbody=0|1 (default: BUDGETS[tier].verlet); gain=<n> (offset scale, dev only);
+      //   stage (scripted T. rex: walk, sharp turn, sudden stop, roar; for A/B video) with view=side|tail|head;
+      //   otherwise the dinos scene (terrain, vegetation, 1 T. rex + herd of 3 triceratops wandering) for frame time;
+      //   noveg; manual (no loop; drive with __dev.step(dt) + __dev.render()); hud=0.
+      import { Scene, PerspectiveCamera, Fog, Color, HemisphereLight, DirectionalLight, Vector3 } from 'three/webgpu';
+      import { createRenderer, startLoop } from '/src/core/renderer.ts';
+      import { BUDGETS } from '/src/core/budgets.ts';
+      import { createTerrain, terrainHeight, CLEARING } from '/src/world/terrain.ts';
+      import { createVegetation } from '/src/world/vegetation.ts';
+      import { Dino, configureDinoLoader } from '/src/dinos/dino.ts';
+      import { DinoWorld } from '/src/dinos/world.ts';
+      import { SecondaryMotion } from '/src/dinos/softbody.ts';
+      import { validateManifest } from '/src/assets/manifest.ts';
+      import manifestJson from '/assets/manifest.json';
+
+      const q = new URLSearchParams(location.search);
+      const tier = ['low', 'medium', 'high'].includes(q.get('tier')) ? q.get('tier') : 'high';
+      const stage = q.has('stage');
+      const canvas = document.getElementById('scene');
+      const { renderer, isWebGPU } = await createRenderer(canvas);
+      const useSoft = isWebGPU && (q.has('softbody') ? q.get('softbody') === '1' : BUDGETS[tier].verlet);
+      const shadows = BUDGETS[tier].shadows;
+      renderer.shadowMap.enabled = shadows;
+      configureDinoLoader(renderer);
+
+      const scene = new Scene();
+      scene.background = new Color(0xa9bfa8);
+      scene.fog = new Fog(0xa9bfa8, 70, 280);
+      scene.add(new HemisphereLight(0xdfffe0, 0x3a3020, 1.1));
+      const sun = new DirectionalLight(0xfff0c8, 3);
+      sun.castShadow = shadows;
+      sun.shadow.mapSize.set(2048, 2048);
+      { const c = sun.shadow.camera; c.left = -40; c.right = 40; c.top = 40; c.bottom = -40; c.near = 1; c.far = 260; sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.05; }
+      sun.position.set(CLEARING.x + 40, 70, CLEARING.z + 30);
+      sun.target.position.set(CLEARING.x, 0, CLEARING.z);
+      scene.add(sun, sun.target);
+      scene.add(createTerrain().group);
+      if (!q.has('noveg') && !stage) scene.add(createVegetation(tier).group);
+
+      const camera = new PerspectiveCamera(stage ? 35 : 50, 1, 0.1, 500);
+      const resize = () => {
+        renderer.setSize(window.innerWidth, window.innerHeight, false);
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+      };
+      window.addEventListener('resize', resize);
+      resize();
+
+      const soft = useSoft ? new SecondaryMotion(renderer) : null;
+      if (soft && q.has('gain')) soft.gain.value = Number(q.get('gain'));
+      const manifest = validateManifest(manifestJson).filter((e) => e.status === 'approved');
+      const dinos = [];
+      let world = null;
+      let stageTrex = null;
+      if (stage) {
+        stageTrex = await Dino.load(manifest.find((e) => e.species === 'tyrannosaurus'), tier);
+        scene.add(stageTrex.root);
+        dinos.push(stageTrex);
+      } else {
+        world = new DinoWorld(scene);
+        for (const e of manifest) {
+          const n = e.species === 'triceratops' ? 3 : 1;
+          for (let i = 0; i < n; i++) {
+            const d = await Dino.load(e, tier);
+            world.add(d, e.species === 'triceratops' ? 'herd' : 'wander');
+            dinos.push(d);
+          }
+        }
+      }
+      const chains = soft ? dinos.reduce((n, d) => n + soft.add(d), 0) : 0;
+
+      // Stage script (seconds): walk 0-2.4 straight, turn 90 deg left over 1.0 s, walk to 5.2, stop (idle), roar at 6.4.
+      const STAGE_END = 10.5;
+      const walk = 1.2;
+      const start = new Vector3(CLEARING.x - 3, 0, CLEARING.z - 4);
+      const yawAt = (t) => (t < 2.4 ? 0 : t < 3.4 ? ((t - 2.4) / 1.0) * (Math.PI / 2) : Math.PI / 2);
+      let st = 0;
+      const pose = { x: start.x, z: start.z };
+      const stageUpdate = (dt) => {
+        st += dt;
+        const moving = st < 5.2;
+        const yaw = yawAt(st);
+        if (moving) { pose.x += Math.sin(yaw) * walk * dt; pose.z += Math.cos(yaw) * walk * dt; }
+        stageTrex.root.position.set(pose.x, terrainHeight(pose.x, pose.z), pose.z);
+        stageTrex.root.rotation.y = yaw;
+        stageTrex.play(st < 5.2 ? 'walk' : st < 6.4 ? 'idle' : 'roar');
+        stageTrex.update(dt);
+      };
+
+      const look = new Vector3();
+      const view = q.get('view') ?? (stage ? 'side' : 'wide');
+      const setView = () => {
+        if (stage) {
+          const c = new Vector3(start.x + 3, 0, start.z + 4);
+          if (view === 'tail') { look.set(c.x - 2, 2.2, c.z - 3.5); camera.position.set(c.x + 9, 3.2, c.z - 12); }
+          else if (view === 'head') { look.set(c.x + 4.5, 3.4, c.z + 2.5); camera.position.set(c.x + 10, 3.6, c.z - 5); }
+          else { look.set(c.x, 2.4, c.z); camera.position.set(c.x + 26, 5, c.z - 6); }
+        } else { look.set(CLEARING.x, 1.5, CLEARING.z); camera.position.set(CLEARING.x - 32, 9, CLEARING.z + 27); }
+        camera.lookAt(look);
+      };
+      setView();
+      if (stage) stageUpdate(0);
+
+      await renderer.compileAsync(scene, camera);
+      renderer.render(scene, camera);
+
+      const hud = document.getElementById('hud');
+      if (q.get('hud') === '0') hud.style.display = 'none';
+      hud.textContent = `tier ${tier} | ${isWebGPU ? 'webgpu' : 'webgl2'} | secondary motion ${soft ? `ON (${chains} chains)` : 'OFF'}`;
+
+      const step = (dt) => {
+        if (stage) stageUpdate(dt); else world.update(dt);
+        soft?.update(dt);
+      };
+      const frames = []; let last = performance.now(), rec = false;
+      const frame = (dt) => {
+        const now = performance.now(); if (rec) frames.push(now - last); last = now;
+        step(dt);
+        renderer.render(scene, camera);
+      };
+      window.__spike = {
+        ready: true, backend: isWebGPU ? 'webgpu' : 'webgl2', adapter: null, trexLoaded: true,
+        config: { tier, softbody: !!soft, chains, dinos: dinos.length, stage },
+        begin() { frames.length = 0; rec = true; }, end() { rec = false; return frames.slice(); },
+      };
+      window.__dev = {
+        tier, soft, chains, stageEnd: STAGE_END, get stageTime() { return st; },
+        step, render() { renderer.render(scene, camera); },
+        async offsets() { if (!soft) return []; const a = await soft.readOffsets(); const r = []; for (let i = 0; i < a.length; i += 4) { const m = Math.hypot(a[i], a[i + 1], a[i + 2]); if (m > 0) r.push([i / 4, Math.round(m * 1000) / 1000, a[i + 3]]); } return r; },
+        async renderAsync() { renderer.render(scene, camera); await renderer.backend.device?.queue.onSubmittedWorkDone(); },
+      };
+      if (!q.has('manual')) startLoop(frame);
+      document.documentElement.dataset.ready = '1';
+    </script>
+  </body>
+</html>
