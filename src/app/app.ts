@@ -14,7 +14,7 @@ import { Controls } from '../ui/controls';
 import { Credits } from '../ui/credits';
 import { Narrator } from '../audio/narrator';
 import { validateManifest } from '../assets/manifest';
-import { loadSpecies } from '../content/load';
+import { ContentStore, streamDinos } from './loader';
 import type { SpeciesContent, SpeciesId } from '../content/schema';
 import { getLang, onLangChange, t } from '../i18n/i18n';
 import manifestJson from '../../assets/manifest.json';
@@ -38,7 +38,10 @@ function injectStyle(): void {
       background: rgba(10,14,10,.78); color: #f1efe4; font: 14px/1.2 system-ui, sans-serif; }
     .dino-hint { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 15; padding: 8px 14px; border-radius: 8px;
       background: rgba(10,14,10,.7); color: #f1efe4; font: 15px/1.3 system-ui, sans-serif; pointer-events: none; }
-    .dino-hint[hidden], .dino-status[hidden] { display: none; }
+    .dino-hint[hidden], .dino-status[hidden], .dino-load-error[hidden] { display: none; }
+    .dino-load-error { position: fixed; left: 50%; top: 24px; transform: translateX(-50%); z-index: 35; display: flex; gap: 12px; align-items: center;
+      padding: 10px 14px; border-radius: 8px; background: rgba(40,14,10,.92); color: #f6e3dd; font: 15px/1.3 system-ui, sans-serif; }
+    .dino-load-error button { font: 600 14px system-ui; padding: 6px 12px; border-radius: 6px; cursor: pointer; }
     .dino-status { position: fixed; inset: 0; z-index: 40; display: grid; place-content: center; gap: 12px; text-align: center;
       background: #0b0f0c; color: #e8efe6; font: 16px/1.4 system-ui, sans-serif; }
     .dino-status button { font: 600 14px system-ui; padding: 10px 16px; border-radius: 8px; cursor: pointer; }`;
@@ -103,13 +106,13 @@ export async function createApp(canvas: HTMLCanvasElement): Promise<void> {
     if (!q.has('noveg')) { vegetation = createVegetation(tier); scene.add(vegetation.group); }
 
     // Dinosaurs: every approved manifest entry; a herd for triceratops, the rest solo.
+    // Models and species text stream in after the intro starts (loader.ts); nothing here waits for them.
     const manifest = validateManifest(manifestJson).filter((e) => e.status === 'approved');
-    const species = new Map<SpeciesId, SpeciesContent>();
-    await Promise.all(manifest.map(async (e) => { species.set(e.species, await loadSpecies(e.species)); }));
+    const content = new ContentStore();
     const world = new DinoWorld(scene);
     const label = div('dino-label', ui);
     world.label = label;
-    world.commonName = (id) => species.get(id)?.commonName[getLang()] ?? id;
+    world.commonName = (id) => content.peek(id)?.commonName[getLang()] ?? id;
     const shadowIdx = new Map<Dino, number>();
     world.onDinoMoved = (d, x, y, z) => {
       const r = d.focusRadius * 0.28;
@@ -118,14 +121,6 @@ export async function createApp(canvas: HTMLCanvasElement): Promise<void> {
       if (i === undefined) shadowIdx.set(d, atmosphere.contactShadows.add(x, y, z, r, 3, yaw));
       else atmosphere.contactShadows.set(i, x, y, z, r, 3, yaw);
     };
-    for (const e of manifest) {
-      const n = e.species === 'triceratops' ? 3 : 1;
-      for (let i = 0; i < n; i++) {
-        const behaviour = e.species === 'triceratops' ? 'herd' : e.species === 'tyrannosaurus' ? 'wander' : 'graze';
-        world.add(await Dino.load(e, tier), behaviour);
-      }
-    }
-
     const director = new CameraDirector(camera, canvas);
     const quality = new QualityRuntime({
       renderer, isWebGPU, tier, director, scene, camera, atmosphere, vegetation: vegetation ?? undefined,
@@ -170,15 +165,32 @@ export async function createApp(canvas: HTMLCanvasElement): Promise<void> {
       updateHint();
     };
 
+    const loadErr = div('dino-load-error', ui);
+    loadErr.hidden = true;
+    const showContentError = (again: () => void): void => {
+      loadErr.replaceChildren();
+      const msg = document.createElement('span');
+      msg.textContent = t('loadError');
+      const retry = document.createElement('button');
+      retry.textContent = t('retry');
+      retry.addEventListener('click', () => { loadErr.hidden = true; again(); });
+      loadErr.append(msg, retry);
+      loadErr.hidden = false;
+    };
+
     const select = async (d: Dino): Promise<void> => {
-      const content = species.get(d.id);
-      if (!content) return;
+      let info = content.peek(d.id);
+      if (!info) {
+        try { info = await content.get(d.id); } catch (e) { console.warn(`content for ${d.id} failed to load`, String(e)); showContentError(() => { void select(d); }); return; }
+        if (selected || director.state !== 'forest') return; // the user moved on while it loaded
+      }
+      loadErr.hidden = true;
       selected = d;
       section = 'behavior';
       pendingBack = false;
       label.style.display = 'none';
       world.setPaused(d, true);
-      panel.show(content, getLang());
+      panel.show(info, getLang());
       narrate();
       updateHint();
       await director.focus(d.proxy, d.focusRadius);
@@ -189,7 +201,7 @@ export async function createApp(canvas: HTMLCanvasElement): Promise<void> {
     panel.onSection((s) => { section = s; narrate(); });
     onLangChange((l) => {
       hintText();
-      const c = selected && species.get(selected.id);
+      const c = selected && content.peek(selected.id);
       if (c) { panel.show(c, l); narrate(); } // same section, new language; Narrator.play stops the old track first
     });
 
@@ -228,11 +240,7 @@ export async function createApp(canvas: HTMLCanvasElement): Promise<void> {
     };
     showOverlay();
 
-    const introDone = director.playIntro();
-    if (q.has('noIntro')) director.skipIntro();
-    else { controls.showSkipIntro(true); controls.onSkipIntro(() => director.skipIntro()); }
-    void introDone.then(() => { controls.showSkipIntro(false); updateHint(); });
-    // Pre-compile pipelines, but never block start-up on it (some software backends never report completion).
+    // Pre-compile the canopy pipelines, but never block start-up on it (some software backends never report completion).
     await Promise.race([renderer.compileAsync(scene, camera), new Promise((r) => setTimeout(r, 15000))]);
 
     let simClock = 0;
@@ -248,7 +256,13 @@ export async function createApp(canvas: HTMLCanvasElement): Promise<void> {
       renderer.render(scene, camera);
     });
 
+    // Renderer + canopy are ready: the intro starts now, dinosaurs stream in while it plays.
     status.hidden = true;
+    const introDone = director.playIntro();
+    if (q.has('noIntro')) director.skipIntro();
+    else { controls.showSkipIntro(true); controls.onSkipIntro(() => director.skipIntro()); }
+    void introDone.then(() => { controls.showSkipIntro(false); updateHint(); });
+    document.documentElement.dataset.intro = '1';
     if (DEV || q.has('test')) {
       const v = new Vector3();
       const find = (id: SpeciesId): Dino => world.dinos.find((d) => d.id === id)!;
@@ -266,6 +280,11 @@ export async function createApp(canvas: HTMLCanvasElement): Promise<void> {
         },
       };
     }
+    await streamDinos({
+      renderer, scene, camera, tier, entries: manifest, content,
+      count: (e) => (e.species === 'triceratops' ? 3 : 1),
+      onLoaded: (e, d) => world.add(d, e.species === 'triceratops' ? 'herd' : e.species === 'tyrannosaurus' ? 'wander' : 'graze'),
+    });
     document.documentElement.dataset.ready = '1';
   } catch (e) {
     fail(e);
