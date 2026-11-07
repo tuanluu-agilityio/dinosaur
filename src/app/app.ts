@@ -14,7 +14,7 @@ import { Controls } from '../ui/controls';
 import { Credits } from '../ui/credits';
 import { Narrator } from '../audio/narrator';
 import { validateManifest } from '../assets/manifest';
-import { ContentStore, streamDinos } from './loader';
+import { ContentStore, streamDinos, warmFlight, renderFrom } from './loader';
 import type { SpeciesContent, SpeciesId } from '../content/schema';
 import { getLang, onLangChange, t } from '../i18n/i18n';
 import manifestJson from '../../assets/manifest.json';
@@ -22,6 +22,7 @@ import manifestJson from '../../assets/manifest.json';
 type Section = keyof SpeciesContent['sections'];
 const BASE: string = (import.meta as { env?: { BASE_URL?: string } }).env?.BASE_URL ?? '/';
 const DEV: boolean = (import.meta as { env?: { DEV?: boolean } }).env?.DEV === true;
+const SETTLE_MS = 5000; // quiet period after the last dinosaur joins before data-ready
 const CLICK_SLOP = 6; // px a pointer may move and still count as a click
 
 function div(cls: string, parent: HTMLElement): HTMLDivElement {
@@ -242,6 +243,8 @@ export async function createApp(canvas: HTMLCanvasElement): Promise<void> {
 
     // Pre-compile the canopy pipelines, but never block start-up on it (some software backends never report completion).
     await Promise.race([renderer.compileAsync(scene, camera), new Promise((r) => setTimeout(r, 15000))]);
+    const warmStep = (dt: number): void => { atmosphere.update(camera, dt); vegetation?.update(dt, camera); };
+    await warmFlight(renderer, scene, camera, warmStep);
 
     let simClock = 0;
     startLoop((dt) => {
@@ -280,11 +283,18 @@ export async function createApp(canvas: HTMLCanvasElement): Promise<void> {
         },
       };
     }
+    const warmed = new Set<SpeciesId>();
     await streamDinos({
       renderer, scene, camera, tier, entries: manifest, content,
       count: (e) => (e.species === 'triceratops' ? 3 : 1),
-      onLoaded: (e, d) => world.add(d, e.species === 'triceratops' ? 'herd' : e.species === 'tyrannosaurus' ? 'wander' : 'graze'),
+      onLoaded: (e, d) => {
+        world.add(d, e.species === 'triceratops' ? 'herd' : e.species === 'tyrannosaurus' ? 'wander' : 'graze');
+        if (!warmed.has(e.species)) { warmed.add(e.species); renderFrom(renderer, scene, camera, warmStep, 1); } // builds its shadow pipeline now
+      },
     });
+    // The GPU finishes some pipeline work a few seconds after a dinosaur joins (measured: one ~400 ms stall about 3.4 s after the
+    // last one on the high tier). "Ready" means loaded and settled, so tests and the perf gate start after that stall, not inside it.
+    await new Promise((r) => setTimeout(r, SETTLE_MS));
     document.documentElement.dataset.ready = '1';
   } catch (e) {
     fail(e);

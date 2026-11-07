@@ -1,7 +1,9 @@
 // Progressive loading: the intro starts once renderer + canopy are ready; dinosaurs and species content stream in afterwards.
 // A failed model or content fetch degrades that one item (hidden dinosaur, error + retry in the panel); the rest keeps working.
 import type { Camera, Object3D, Scene, Texture, WebGPURenderer } from 'three/webgpu';
+import { Quaternion, Vector3 } from 'three/webgpu';
 import { Dino } from '../dinos/dino';
+import { sampleIntro } from '../camera/paths';
 import type { AssetEntry } from '../assets/manifest';
 import type { QualityTier } from '../core/quality';
 import { loadSpecies } from '../content/load';
@@ -9,6 +11,44 @@ import type { SpeciesContent, SpeciesId } from '../content/schema';
 
 const TEXTURE_KEYS = ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'emissiveMap'] as const;
 const WARM_TIMEOUT_MS = 8000;
+
+const _pos = new Vector3();
+const _look = new Vector3();
+
+/**
+ * Renders the canopy once from several points of the intro flight (while the loading screen still covers the canvas), so vegetation
+ * buffers, shadow passes and pipelines the flight will meet are created now and not as frame spikes during the intro.
+ */
+export async function warmFlight(renderer: WebGPURenderer, scene: Scene, camera: PerspectiveCameraLike, step: (dt: number) => void): Promise<void> {
+  for (const u of [1, 0.75, 0.5, 0.25, 0]) {
+    renderFrom(renderer, scene, camera, step, u);
+    await frame();
+  }
+}
+
+const _savedPos = new Vector3();
+const _savedQuat = new Quaternion();
+
+/**
+ * One render from the intro pose `u`, then the camera is put back. Called right after a dinosaur joins the scene so its sun-shadow
+ * (skinned depth) pipeline is built now, not when the flight first brings it into the shadow frustum (a 400+ ms hitch on the high tier).
+ */
+export function renderFrom(renderer: WebGPURenderer, scene: Scene, camera: PerspectiveCameraLike, step: (dt: number) => void, u: number): void {
+  _savedPos.copy(camera.position);
+  _savedQuat.copy(camera.quaternion);
+  sampleIntro(u, _pos, _look);
+  camera.position.copy(_pos);
+  camera.lookAt(_look);
+  camera.updateMatrixWorld(true);
+  step(0);
+  renderer.render(scene, camera);
+  camera.position.copy(_savedPos);
+  camera.quaternion.copy(_savedQuat);
+  camera.updateMatrixWorld(true);
+}
+
+type PerspectiveCameraLike = Camera & { lookAt(v: Vector3): void };
+export type { PerspectiveCameraLike };
 
 const frame = (): Promise<void> => new Promise((r) => requestAnimationFrame(() => r()));
 
