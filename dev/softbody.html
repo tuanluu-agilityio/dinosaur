@@ -107,17 +107,23 @@
 
       const look = new Vector3();
       const view = q.get('view') ?? (stage ? 'side' : 'wide');
+      // Stage views: side = fixed, sees the left flank on the first leg and the rear three-quarter after the turn;
+      // tail / head = follow the animal in its own frame (behind-left of the tail, front-right of the head).
+      const FOLLOW = { tail: [[-6, 3.2, -9], [0, 2.4, -3.5]], head: [[4.5, 3.6, 9], [0, 3.1, 5.2]] };
+      const local = (out, [x, y, z], yaw, o) => out.set(o.x + x * Math.cos(yaw) + z * Math.sin(yaw), y, o.z - x * Math.sin(yaw) + z * Math.cos(yaw));
       const setView = () => {
-        if (stage) {
+        if (stage && FOLLOW[view]) {
+          const r = stageTrex.root;
+          local(camera.position, FOLLOW[view][0], r.rotation.y, r.position);
+          local(look, FOLLOW[view][1], r.rotation.y, r.position);
+        } else if (stage) {
           const c = new Vector3(start.x + 3, 0, start.z + 4);
-          if (view === 'tail') { look.set(c.x - 2, 2.2, c.z - 3.5); camera.position.set(c.x + 9, 3.2, c.z - 12); }
-          else if (view === 'head') { look.set(c.x + 4.5, 3.4, c.z + 2.5); camera.position.set(c.x + 10, 3.6, c.z - 5); }
-          else { look.set(c.x, 2.4, c.z); camera.position.set(c.x + 26, 5, c.z - 6); }
+          look.set(c.x + 1, 2.2, c.z + 1); camera.position.set(c.x - 20, 6, c.z + 6);
         } else { look.set(CLEARING.x, 1.5, CLEARING.z); camera.position.set(CLEARING.x - 32, 9, CLEARING.z + 27); }
         camera.lookAt(look);
       };
-      setView();
       if (stage) stageUpdate(0);
+      setView();
 
       await renderer.compileAsync(scene, camera);
       renderer.render(scene, camera);
@@ -127,10 +133,10 @@
       hud.textContent = `tier ${tier} | ${isWebGPU ? 'webgpu' : 'webgl2'} | secondary motion ${soft ? `ON (${chains} chains)` : 'OFF'}`;
 
       const step = (dt) => {
-        if (stage) stageUpdate(dt); else world.update(dt);
-        soft?.update(dt);
+        if (stage) { stageUpdate(dt); if (FOLLOW[view]) setView(); } else world.update(dt);
+        if (soft) { const t0 = performance.now(); soft.update(dt); if (rec) cpuSoft.push(performance.now() - t0); }
       };
-      const frames = []; let last = performance.now(), rec = false;
+      const frames = [], cpuSoft = []; let last = performance.now(), rec = false;
       const frame = (dt) => {
         const now = performance.now(); if (rec) frames.push(now - last); last = now;
         step(dt);
@@ -139,7 +145,10 @@
       window.__spike = {
         ready: true, backend: isWebGPU ? 'webgpu' : 'webgl2', adapter: null, trexLoaded: true,
         config: { tier, softbody: !!soft, chains, dinos: dinos.length, stage },
-        begin() { frames.length = 0; rec = true; }, end() { rec = false; return frames.slice(); },
+        begin() { frames.length = 0; cpuSoft.length = 0; rec = true; },
+        end() { rec = false; return frames.slice(); },
+        /** Per-frame CPU time (ms) of SecondaryMotion.update in the last recording. */
+        samples() { return { cpuSoft: cpuSoft.slice() }; },
       };
       window.__dev = {
         tier, soft, chains, stageEnd: STAGE_END, get stageTime() { return st; },
