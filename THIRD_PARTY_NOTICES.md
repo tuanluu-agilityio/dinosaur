@@ -46,3 +46,12 @@ https://freesound.org/people/felix.blume/sounds/410357/
 ## Flora
 
 Procedural; no third-party assets.
+
+## Basis Universal transcoder (Apache-2.0)
+
+`public/basis/basis_transcoder.js` and `public/basis/basis_transcoder.wasm` are the Basis Universal
+KTX2/Basis transcoder, copyright Binomial LLC, https://github.com/BinomialLLC/basis_universal.
+They were copied unmodified from three 0.187.0 `examples/jsm/libs/basis` and ship in `dist/basis/`.
+(The copy in three carries no separate copyright line; its README points to the upstream licence.)
+
+Licensed under the Apache License, Version 2.0: https://www.apache.org/licenses/LICENSE-2.0
