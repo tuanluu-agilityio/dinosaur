@@ -37,6 +37,12 @@ export class CameraDirector {
   private dragging = false;
   private lastX = 0;
   private lastY = 0;
+  /** Where the target sits on screen, NDC. (0,0) = centre; moved into the area the info panel leaves free. */
+  private shift = { x: 0, y: 0 };
+  private shiftFrom = { x: 0, y: 0 };
+  private shiftTo = { x: 0, y: 0 };
+  private shiftApplied = { x: 0, y: 0 };
+  private focusInfo: { center: Vector3; radius: number } | null = null;
   private tmpA = new Vector3();
   private tmpB = new Vector3();
 
@@ -155,11 +161,40 @@ export class CameraDirector {
     return promise;
   }
 
+  /** Share of the viewport the info panel leaves free (desktop: left 2/3, portrait phone: top half) and its centre in NDC. */
+  private freeArea(): { w: number; h: number; x: number; y: number } {
+    return this.camera.aspect < 1 ? { w: 1, h: 0.5, x: 0, y: 0.5 } : { w: 2 / 3, h: 1, x: -1 / 3, y: 0 };
+  }
+
+  /** Where the focused target should appear on screen (NDC). */
+  get frameShift(): { x: number; y: number } {
+    return { x: this.shift.x, y: this.shift.y };
+  }
+
+  /** Re-apply the off-centre projection; call after anything that rebuilds the projection matrix. */
+  private applyShift(): void {
+    const { x, y } = this.shift;
+    const a = this.shiftApplied;
+    if (x === 0 && y === 0 && a.x === 0 && a.y === 0) return;
+    this.camera.updateProjectionMatrix();
+    const e = this.camera.projectionMatrix.elements;
+    e[8] = -x;
+    e[9] = -y;
+    this.camera.projectionMatrixInverse.copy(this.camera.projectionMatrix).invert();
+    a.x = x;
+    a.y = y;
+  }
+
+  private setShiftTarget(x: number, y: number): void {
+    this.shiftFrom = { ...this.shift };
+    this.shiftTo = { x, y };
+  }
+
   /** Framing distance: 2.5r on desktop; widened when the horizontal FOV is the limiting one. */
   private fitDistance(radius: number): number {
     const tv = Math.tan(MathUtils.degToRad(this.camera.fov) / 2);
-    const hfov = 2 * Math.atan(tv * this.camera.aspect);
-    const widen = Math.max(1, tv / Math.tan(hfov / 2));
+    const free = this.freeArea();
+    const widen = Math.max(1, 1 / Math.min(this.camera.aspect * free.w, free.h));
     return MathUtils.clamp(radius * 2.5 * widen, radius * 1.2, radius * 4);
   }
 
@@ -172,6 +207,9 @@ export class CameraDirector {
     dir.normalize();
     dir.y = Math.max(dir.y, 0.25); // approach from slightly above the ground
     dir.normalize();
+    const free = this.freeArea();
+    this.setShiftTarget(free.x, free.y);
+    this.focusInfo = { center: center.clone(), radius };
     const toPos = center.clone().addScaledVector(dir, this.fitDistance(radius));
     const m = new Matrix4().lookAt(toPos, center, AXIS_Y);
     const toQuat = new Quaternion().setFromRotationMatrix(m);
@@ -191,6 +229,8 @@ export class CameraDirector {
   returnToForest(): Promise<void> {
     if (this._state === 'flying' && this.flightPromise) return this.flightPromise;
     if (this._state === 'forest' || this._state === 'intro') return Promise.resolve();
+    this.setShiftTarget(0, 0);
+    this.focusInfo = null;
     return this.fly(this.forestPos.clone(), this.forestQuat.clone(), () => {
       this.yaw = 0;
       this.pitch = 0;
@@ -198,7 +238,31 @@ export class CameraDirector {
     });
   }
 
+  /** Aspect flipped (phone rotated, window resized) while focused: re-aim the shift and the fit distance. */
+  private reframe(): void {
+    const info = this.focusInfo;
+    if (!info) return;
+    const free = this.freeArea();
+    if (free.x === this.shiftTo.x && free.y === this.shiftTo.y) return;
+    if (this.flight) {
+      const f = this.flight;
+      this.shiftFrom = { ...this.shift };
+      this.shiftTo = { x: free.x, y: free.y };
+      const dir = f.toPos.clone().sub(info.center).normalize();
+      f.toPos.copy(info.center).addScaledVector(dir, this.fitDistance(info.radius));
+    } else if (this._state === 'closeup') {
+      void this.focus(this.proxyAt(info.center), info.radius);
+    }
+  }
+
+  private proxyAt(c: Vector3): Object3D {
+    const o = new Object3D();
+    o.position.copy(c);
+    return o;
+  }
+
   update(dt: number): void {
+    this.reframe();
     if (this._state === 'intro') {
       this.introT += dt;
       const u = Math.min(1, this.introT / this.introDuration);
@@ -210,9 +274,12 @@ export class CameraDirector {
       const e = smooth(f.t / FLIGHT_SEC);
       this.camera.position.lerpVectors(f.fromPos, f.toPos, e);
       this.camera.quaternion.slerpQuaternions(f.fromQuat, f.toQuat, e);
+      this.shift.x = MathUtils.lerp(this.shiftFrom.x, this.shiftTo.x, e);
+      this.shift.y = MathUtils.lerp(this.shiftFrom.y, this.shiftTo.y, e);
       if (f.t >= FLIGHT_SEC) {
         this.camera.position.copy(f.toPos);
         this.camera.quaternion.copy(f.toQuat);
+        this.shift = { ...this.shiftTo };
         this.flight = null;
         this.flightPromise = null;
         const end = this.flightEnd;
@@ -223,6 +290,7 @@ export class CameraDirector {
     } else if (this._state === 'closeup') {
       this.controls.update();
     }
+    this.applyShift();
   }
 
   dispose(): void {
