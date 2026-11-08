@@ -6,6 +6,7 @@ import { Dino } from '../dinos/dino';
 import { sampleIntro } from '../camera/paths';
 import type { AssetEntry } from '../assets/manifest';
 import type { QualityTier } from '../core/quality';
+import { BUDGETS } from '../core/budgets';
 import { loadSpecies } from '../content/load';
 import type { SpeciesContent, SpeciesId } from '../content/schema';
 
@@ -100,6 +101,26 @@ export class ContentStore {
   }
 }
 
+/** True when focusing `d` should swap in the tier's detail model (high tier, forest animal still on the light variant). */
+export function wantsUpgrade(d: Dino, entry: AssetEntry | undefined, tier: QualityTier): entry is AssetEntry {
+  return !!entry && d.variant === 'low' && BUDGETS[tier].dinoVariant === 'high' && !!entry.files.high;
+}
+
+/**
+ * Loads and warms up the detail variant of `entry`, ready for `DinoWorld.replace`. Rejects if the model fails to load; the caller
+ * keeps the light model then.
+ */
+export async function upgradeDino(renderer: WebGPURenderer, scene: Scene, camera: Camera, entry: AssetEntry): Promise<Dino> {
+  const next = await Dino.load(entry, 'high', 'high');
+  try {
+    await warmDino(renderer, scene, camera, next.root);
+  } catch (e) {
+    next.dispose();
+    throw e;
+  }
+  return next;
+}
+
 export interface StreamOptions {
   renderer: WebGPURenderer;
   scene: Scene;
@@ -121,7 +142,8 @@ export async function streamDinos(o: StreamOptions): Promise<{ loaded: Dino[]; f
   const failed: SpeciesId[] = [];
   for (const e of o.entries) o.content.get(e.species).catch((err: unknown) => console.warn(`content for ${e.species} unavailable`, String(err)));
   const jobs = o.entries.map((e) => {
-    return Promise.all(Array.from({ length: o.count(e) }, () => Dino.load(e, o.tier))).catch((err: unknown) => {
+    // The forest always uses the light variant (smaller upload, cheaper to shade); the tier's detail model loads on focus (upgradeDino).
+    return Promise.all(Array.from({ length: o.count(e) }, () => Dino.load(e, o.tier, 'low'))).catch((err: unknown) => {
       console.warn(`model for ${e.species} failed to load; it will not appear`, String(err));
       failed.push(e.species);
       return [] as Dino[];

@@ -14,7 +14,7 @@ import { Controls } from '../ui/controls';
 import { Credits } from '../ui/credits';
 import { Narrator } from '../audio/narrator';
 import { validateManifest } from '../assets/manifest';
-import { ContentStore, streamDinos, warmFlight, renderFrom } from './loader';
+import { ContentStore, streamDinos, warmFlight, renderFrom, upgradeDino, wantsUpgrade } from './loader';
 import type { SpeciesContent, SpeciesId } from '../content/schema';
 import { getLang, onLangChange, t } from '../i18n/i18n';
 import manifestJson from '../../assets/manifest.json';
@@ -122,6 +122,10 @@ export async function createApp(canvas: HTMLCanvasElement): Promise<void> {
       if (i === undefined) shadowIdx.set(d, atmosphere.contactShadows.add(x, y, z, r, 3, yaw));
       else atmosphere.contactShadows.set(i, x, y, z, r, 3, yaw);
     };
+    world.onDinoReplaced = (from, to) => {
+      const i = shadowIdx.get(from);
+      if (i !== undefined) { shadowIdx.delete(from); shadowIdx.set(to, i); }
+    };
     const director = new CameraDirector(camera, canvas);
     const quality = new QualityRuntime({
       renderer, isWebGPU, tier, director, scene, camera, atmosphere, vegetation: vegetation ?? undefined,
@@ -168,14 +172,16 @@ export async function createApp(canvas: HTMLCanvasElement): Promise<void> {
 
     const loadErr = div('dino-load-error', ui);
     loadErr.hidden = true;
+    const errMsg = document.createElement('span');
+    const errRetry = document.createElement('button');
+    let errAgain: (() => void) | null = null;
+    errRetry.addEventListener('click', () => { loadErr.hidden = true; errAgain?.(); });
+    loadErr.append(errMsg, errRetry);
+    const errText = (): void => { errMsg.textContent = t('loadError'); errRetry.textContent = t('retry'); };
+    errText();
     const showContentError = (again: () => void): void => {
-      loadErr.replaceChildren();
-      const msg = document.createElement('span');
-      msg.textContent = t('loadError');
-      const retry = document.createElement('button');
-      retry.textContent = t('retry');
-      retry.addEventListener('click', () => { loadErr.hidden = true; again(); });
-      loadErr.append(msg, retry);
+      errAgain = again;
+      errText();
       loadErr.hidden = false;
     };
 
@@ -187,6 +193,17 @@ export async function createApp(canvas: HTMLCanvasElement): Promise<void> {
       }
       loadErr.hidden = true;
       selected = d;
+      const entry = manifest.find((m) => m.species === d.id);
+      if (wantsUpgrade(d, entry, tier)) {
+        // High tier: the detail model loads while the camera flies in and replaces the light one in place (same pose, no jump).
+        upgradeDino(renderer, scene, camera, entry).then(
+          (next) => {
+            if (selected !== d) { next.dispose(); return; } // the user already left this animal
+            if (world.replace(d, next)) selected = next;
+          },
+          (e: unknown) => console.warn(`detail model for ${d.id} failed to load; keeping the light one`, String(e)),
+        );
+      }
       section = 'behavior';
       pendingBack = false;
       label.style.display = 'none';
@@ -202,6 +219,7 @@ export async function createApp(canvas: HTMLCanvasElement): Promise<void> {
     panel.onSection((s) => { section = s; narrate(); });
     onLangChange((l) => {
       hintText();
+      errText();
       const c = selected && content.peek(selected.id);
       if (c) { panel.show(c, l); narrate(); } // same section, new language; Narrator.play stops the old track first
     });

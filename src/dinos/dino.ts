@@ -1,10 +1,11 @@
 // One living dinosaur: glTF model, animation mixer, focus radius and a cheap picking proxy.
 import {
   AnimationAction, AnimationClip, AnimationMixer, Box3, CapsuleGeometry, Group, LoopRepeat, Mesh, MeshBasicNodeMaterial, Object3D,
-  Sphere, Vector3, type WebGPURenderer,
+  Sphere, Vector3, type Material, type Texture, type WebGPURenderer,
 } from 'three/webgpu';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { KTX2Loader } from 'three/addons/loaders/KTX2Loader.js';
+import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import type { AssetEntry } from '../assets/manifest';
 import type { SpeciesId } from '../content/schema';
@@ -40,6 +41,27 @@ function getLoader(): GLTFLoader {
 /** Manifest paths are repo-relative (public/models/x.glb); the site serves public/ at the base URL. */
 export const modelUrl = (path: string): string => `${BASE}${path.replace(/^public\//, '')}`;
 
+/**
+ * Parsed models by URL, shared by every animal of a species: clones share geometry, materials and textures, so three herd animals
+ * upload their textures and compile their pipelines once. Reference-counted so the last animal to go frees the GPU resources.
+ */
+interface Shared { gltf: Promise<{ scene: Group; animations: AnimationClip[] }>; refs: number }
+const shared = new Map<string, Shared>();
+
+function disposeScene(root: Object3D): void {
+  const textures = new Set<Texture>();
+  root.traverse((o) => {
+    const m = o as Mesh;
+    if (!m.isMesh) return;
+    m.geometry.dispose();
+    for (const mat of Array.isArray(m.material) ? m.material : [m.material]) {
+      for (const v of Object.values(mat as Material)) if (v && (v as Texture).isTexture) textures.add(v as Texture);
+      mat.dispose();
+    }
+  });
+  for (const t of textures) t.dispose();
+}
+
 const _box = new Box3();
 const _size = new Vector3();
 const _centre = new Vector3();
@@ -58,8 +80,11 @@ export class Dino {
   private readonly fader = new ClipFader();
   private active: AnimationAction | null = null;
 
-  private constructor(entry: AssetEntry, scene: Group, animations: AnimationClip[], variant: 'low' | 'high') {
+  private readonly url: string;
+
+  private constructor(entry: AssetEntry, scene: Group, animations: AnimationClip[], variant: 'low' | 'high', url: string) {
     this.id = entry.species;
+    this.url = url;
     this.variant = variant;
     this.root = new Group();
     this.root.name = `dino-${entry.species}`;
@@ -99,12 +124,44 @@ export class Dino {
     this.root.add(this.proxy);
   }
 
-  static async load(entry: AssetEntry, tier: QualityTier): Promise<Dino> {
+  /** Loads one animal. `variant` forces a model variant; by default the tier's budget decides. */
+  static async load(entry: AssetEntry, tier: QualityTier, variant?: 'low' | 'high'): Promise<Dino> {
     if (entry.status !== 'approved') throw new Error(`Dino.load: ${entry.species} is not approved`);
-    const want = BUDGETS[tier].dinoVariant;
-    const variant = want === 'low' && entry.files.low ? 'low' : 'high';
-    const gltf = await getLoader().loadAsync(modelUrl(entry.files[variant]));
-    return new Dino(entry, gltf.scene, gltf.animations, variant);
+    const want = variant ?? BUDGETS[tier].dinoVariant;
+    const v = want === 'low' && entry.files.low ? 'low' : 'high';
+    const url = modelUrl(entry.files[v]);
+    let s = shared.get(url);
+    if (!s) {
+      s = { gltf: getLoader().loadAsync(url), refs: 0 };
+      shared.set(url, s);
+      s.gltf.catch(() => { if (shared.get(url) === s) shared.delete(url); }); // a failed fetch is not cached
+    }
+    s.refs++;
+    try {
+      const gltf = await s.gltf;
+      return new Dino(entry, cloneSkinned(gltf.scene) as Group, gltf.animations, v, url);
+    } catch (e) {
+      s.refs--;
+      throw e;
+    }
+  }
+
+  /** Releases this animal; the last animal of a model frees its geometry, materials and textures. */
+  dispose(): void {
+    this.mixer.stopAllAction();
+    this.root.removeFromParent();
+    const s = shared.get(this.url);
+    if (!s || --s.refs > 0) return;
+    shared.delete(this.url);
+    void s.gltf.then((g) => disposeScene(g.scene));
+  }
+
+  /** Continues `from`'s clip at the same time, so swapping models mid-animation does not visibly jump. */
+  matchPose(from: Dino): void {
+    const clip = from.currentClip;
+    if (!clip) return;
+    this.play(clip);
+    if (this.active && from.active) this.active.time = from.active.time;
   }
 
   /** Plays a clip (falling back to one the model has). Cross-fades 0.4 s, only when the clip actually changes. */

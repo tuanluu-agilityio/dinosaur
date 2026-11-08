@@ -40,6 +40,8 @@ export class DinoWorld {
   readonly dinos: Dino[] = [];
   /** Hook for the atmosphere task (contact shadows): called whenever a dino is placed or moved. */
   onDinoMoved: ((d: Dino, x: number, y: number, z: number) => void) | null = null;
+  /** Called after `replace` swapped a dino for another model of the same animal (the page moves per-dino bookkeeping over). */
+  onDinoReplaced: ((from: Dino, to: Dino) => void) | null = null;
   /** Hover label element and the species-name lookup (the page fills it from the bilingual species content). */
   label: HTMLElement | null = null;
   commonName: (id: SpeciesId) => string = (id) => id;
@@ -93,6 +95,27 @@ export class DinoWorld {
     this.apply(entry);
     d.play(clipForSpeed(0, behaviour === 'graze'));
     d.desync(this.rng() * 2);
+  }
+
+  /**
+   * Swaps `from` for `to` (another model of the same species, e.g. the high-detail variant) in place: same spot, heading, behaviour,
+   * pause state, clip and clip time, so the animal does not jump. `from` is disposed. Returns false if `from` is not in the world.
+   */
+  replace(from: Dino, to: Dino): boolean {
+    const entry = this.entries.find((e) => e.dino === from);
+    if (!entry) return false;
+    entry.dino = to;
+    this.dinos[this.dinos.indexOf(from)] = to;
+    this.proxies[this.proxies.indexOf(from.proxy)] = to.proxy;
+    if (this.hovered === from) this.hovered = to;
+    to.root.position.copy(from.root.position);
+    to.root.rotation.y = from.root.rotation.y;
+    to.matchPose(from);
+    this.scene.add(to.root);
+    to.root.updateMatrixWorld(true);
+    this.onDinoReplaced?.(from, to);
+    from.dispose();
+    return true;
   }
 
   /** Nearest dinosaur hit by the ray through `ndc`, tested against the capsule proxies only. */
