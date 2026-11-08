@@ -46,6 +46,11 @@ test('a failed content fetch shows loadError with retry, and retry opens the pan
   await expect(err).toBeVisible({ timeout: 20_000 });
   await expect(err).toContainText(/Could not load content|Không thể tải nội dung/);
   expect(await page.evaluate(() => (window as any).__app.selected)).toBeNull();
+  // The error text follows the language switch (it is not frozen in the language it appeared in).
+  const first = (await err.textContent()) ?? '';
+  await page.locator('.dino-controls__lang').click();
+  await expect.poll(async () => (await err.textContent()) ?? '').not.toBe(first);
+  await expect(err).toContainText(/Could not load content|Không thể tải nội dung/);
   block = false;
   await err.getByRole('button').click();
   await expect.poll(() => page.evaluate(() => (window as any).__app.selected), { timeout: 20_000 }).toBe('tyrannosaurus');
@@ -68,4 +73,22 @@ test('slow model and content responses: the intro still plays and dinosaurs arri
   expect(await page.evaluate(() => (window as any).__app.simClock)).toBeGreaterThan(t0); // frames keep rendering while content is pending
   await page.waitForSelector('html[data-ready="1"]', { timeout: 150_000 });
   expect(await page.evaluate(() => (window as any).__app.world.dinos.length)).toBeGreaterThan(0);
+});
+
+test('high tier: the light forest model is replaced by the detail model on focus, in place', async ({ page }) => {
+  watch(page);
+  await page.goto('/dinosaur/?test&tier=high&governor=0&noIntro');
+  await page.waitForSelector('html[data-ready="1"]', { timeout: 150_000 });
+  const before = await page.evaluate(() => (window as any).__app.world.dinos.map((d: any) => d.variant));
+  expect(before.every((v: string) => v === 'low')).toBe(true);
+  await page.evaluate(() => (window as any).__app.freeze(true));
+  const at = await page.evaluate(() => { const d = (window as any).__app.world.dinos.find((x: any) => x.id === 'tyrannosaurus'); return d.root.position.toArray(); });
+  await page.evaluate(() => (window as any).__app.lookAt('tyrannosaurus'));
+  const p = await page.evaluate(() => (window as any).__app.screenOf('tyrannosaurus'));
+  await page.mouse.click(p.x, p.y);
+  await expect.poll(() => page.evaluate(() => (window as any).__app.world.dinos.find((x: any) => x.id === 'tyrannosaurus').variant), { timeout: 60_000 }).toBe('high');
+  const after = await page.evaluate(() => { const w = (window as any).__app.world; const d = w.dinos.find((x: any) => x.id === 'tyrannosaurus'); return { pos: d.root.position.toArray(), count: w.dinos.length, sel: (window as any).__app.selected }; });
+  expect(after.pos).toEqual(at); // swapped in place
+  expect(after.count).toBe(before.length); // replaced, not added
+  expect(after.sel).toBe('tyrannosaurus');
 });

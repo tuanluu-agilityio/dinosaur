@@ -287,6 +287,7 @@ export async function createApp(canvas: HTMLCanvasElement): Promise<void> {
     if (q.has('noIntro')) director.skipIntro();
     else { controls.showSkipIntro(true); controls.onSkipIntro(() => director.skipIntro()); }
     void introDone.then(() => { controls.showSkipIntro(false); updateHint(); });
+    updateHint(); // the click hint stays hidden during the intro
     document.documentElement.dataset.intro = '1';
     if (DEV || q.has('test')) {
       const v = new Vector3();
