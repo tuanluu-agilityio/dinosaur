@@ -42,6 +42,7 @@ export class CameraDirector {
   private shiftFrom = { x: 0, y: 0 };
   private shiftTo = { x: 0, y: 0 };
   private shiftApplied = { x: 0, y: 0 };
+  private focusInfo: { center: Vector3; radius: number } | null = null;
   private tmpA = new Vector3();
   private tmpB = new Vector3();
 
@@ -208,6 +209,7 @@ export class CameraDirector {
     dir.normalize();
     const free = this.freeArea();
     this.setShiftTarget(free.x, free.y);
+    this.focusInfo = { center: center.clone(), radius };
     const toPos = center.clone().addScaledVector(dir, this.fitDistance(radius));
     const m = new Matrix4().lookAt(toPos, center, AXIS_Y);
     const toQuat = new Quaternion().setFromRotationMatrix(m);
@@ -228,6 +230,7 @@ export class CameraDirector {
     if (this._state === 'flying' && this.flightPromise) return this.flightPromise;
     if (this._state === 'forest' || this._state === 'intro') return Promise.resolve();
     this.setShiftTarget(0, 0);
+    this.focusInfo = null;
     return this.fly(this.forestPos.clone(), this.forestQuat.clone(), () => {
       this.yaw = 0;
       this.pitch = 0;
@@ -235,7 +238,31 @@ export class CameraDirector {
     });
   }
 
+  /** Aspect flipped (phone rotated, window resized) while focused: re-aim the shift and the fit distance. */
+  private reframe(): void {
+    const info = this.focusInfo;
+    if (!info) return;
+    const free = this.freeArea();
+    if (free.x === this.shiftTo.x && free.y === this.shiftTo.y) return;
+    if (this.flight) {
+      const f = this.flight;
+      this.shiftFrom = { ...this.shift };
+      this.shiftTo = { x: free.x, y: free.y };
+      const dir = f.toPos.clone().sub(info.center).normalize();
+      f.toPos.copy(info.center).addScaledVector(dir, this.fitDistance(info.radius));
+    } else if (this._state === 'closeup') {
+      void this.focus(this.proxyAt(info.center), info.radius);
+    }
+  }
+
+  private proxyAt(c: Vector3): Object3D {
+    const o = new Object3D();
+    o.position.copy(c);
+    return o;
+  }
+
   update(dt: number): void {
+    this.reframe();
     if (this._state === 'intro') {
       this.introT += dt;
       const u = Math.min(1, this.introT / this.introDuration);
