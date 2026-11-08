@@ -1,12 +1,13 @@
 // Composes the whole experience: renderer, world, atmosphere, dinosaurs, camera director, panel, narration and ambient audio.
-import { Scene, PerspectiveCamera, Vector2, Vector3, ACESFilmicToneMapping } from 'three/webgpu';
+import { Scene, PerspectiveCamera, Vector2, Vector3, Quaternion, ACESFilmicToneMapping, type WebGPURenderer } from 'three/webgpu';
+import { sampleIntro } from '../camera/paths';
 import { createRenderer, startLoop } from '../core/renderer';
 import { detectTier, readDeviceCaps, type QualityTier } from '../core/quality';
 import { QualityRuntime, installQualityProbe, qualityParams } from './quality-runtime';
 import { createTerrain } from '../world/terrain';
 import { createVegetation, type Vegetation } from '../world/vegetation';
 import { Atmosphere } from '../world/atmosphere';
-import { Dino, configureDinoLoader } from '../dinos/dino';
+import type { Dino } from '../dinos/dino';
 import { DinoWorld } from '../dinos/world';
 import { CameraDirector } from '../camera/director';
 import { InfoPanel } from '../ui/panel';
@@ -14,7 +15,7 @@ import { Controls } from '../ui/controls';
 import { Credits } from '../ui/credits';
 import { Narrator } from '../audio/narrator';
 import { validateManifest } from '../assets/manifest';
-import { ContentStore, preloadDinos, streamDinos, warmFlight, renderFrom, upgradeDino, wantsUpgrade } from './loader';
+import type { ContentStore } from './loader';
 import type { SpeciesContent, SpeciesId } from '../content/schema';
 import { getLang, onLangChange, t } from '../i18n/i18n';
 import manifestJson from '../../assets/manifest.json';
@@ -73,6 +74,26 @@ class Ambient {
   }
 }
 
+const _pos = new Vector3();
+const _look = new Vector3();
+const _savedPos = new Vector3();
+const _savedQuat = new Quaternion();
+
+/** One render from intro pose `u`, then the camera is restored (builds buffers and pipelines the flight will meet). Kept here so loader.ts stays out of the first-frame bundle. */
+function renderFlightPose(renderer: WebGPURenderer, scene: Scene, camera: PerspectiveCamera, step: (dt: number) => void, u: number): void {
+  _savedPos.copy(camera.position);
+  _savedQuat.copy(camera.quaternion);
+  sampleIntro(u, _pos, _look);
+  camera.position.copy(_pos);
+  camera.lookAt(_look);
+  camera.updateMatrixWorld(true);
+  step(0);
+  renderer.render(scene, camera);
+  camera.position.copy(_savedPos);
+  camera.quaternion.copy(_savedQuat);
+  camera.updateMatrixWorld(true);
+}
+
 export async function createApp(canvas: HTMLCanvasElement): Promise<void> {
   const q = new URLSearchParams(location.search);
   injectStyle();
@@ -95,15 +116,16 @@ export async function createApp(canvas: HTMLCanvasElement): Promise<void> {
   try {
     const { renderer, isWebGPU } = await createRenderer(canvas);
     renderer.toneMapping = ACESFilmicToneMapping;
-    configureDinoLoader(renderer);
+    // Dinosaur code (GLTF/KTX2/meshopt decoders, ~65 kB gz) is not needed for the first frame: fetch it now, while the canopy compiles.
+    const lazy = Promise.all([import('./loader'), import('../dinos/dino')]);
+    lazy.catch(() => { /* reported where it is awaited, after the intro starts */ });
     const qp = qualityParams(location.search);
     let tier: QualityTier = qp.tier ?? detectTier({ ...readDeviceCaps(), webgpu: isWebGPU });
 
     // Models and species text start loading now, behind the loading screen; they join the scene once the intro runs.
     const manifest = validateManifest(manifestJson).filter((e) => e.status === 'approved');
-    const content = new ContentStore();
+    let content!: ContentStore; // created once the dinosaur chunk has arrived (below)
     const countOf = (e: { species: SpeciesId }): number => (e.species === 'triceratops' ? 3 : 1);
-    const preload = preloadDinos(manifest, tier, countOf, content);
 
     const scene = new Scene();
     const camera = new PerspectiveCamera(50, 1, 0.1, 400);
@@ -266,7 +288,10 @@ export async function createApp(canvas: HTMLCanvasElement): Promise<void> {
     // Pre-compile the canopy pipelines, but never block start-up on it (some software backends never report completion).
     await Promise.race([renderer.compileAsync(scene, camera), new Promise((r) => setTimeout(r, 15000))]);
     const warmStep = (dt: number): void => { atmosphere.update(camera, dt); vegetation?.update(dt, camera); };
-    await warmFlight(renderer, scene, camera, warmStep);
+    for (const u of [1, 0.75, 0.5, 0.25, 0]) {
+      renderFlightPose(renderer, scene, camera, warmStep, u);
+      await new Promise<void>((r) => requestAnimationFrame(() => r()));
+    }
 
     let simClock = 0;
     startLoop((dt) => {
@@ -307,11 +332,16 @@ export async function createApp(canvas: HTMLCanvasElement): Promise<void> {
       };
     }
     const warmed = new Set<SpeciesId>();
+    const [L, dinoMod] = await lazy;
+    const { ContentStore: Store, preloadDinos, streamDinos, upgradeDino, wantsUpgrade } = L;
+    dinoMod.configureDinoLoader(renderer);
+    content = new Store();
+    const preload = preloadDinos(manifest, tier, countOf, content);
     await streamDinos({
       renderer, scene, camera, preload,
       onLoaded: (e, d) => {
         world.add(d, e.species === 'triceratops' ? 'herd' : e.species === 'tyrannosaurus' ? 'wander' : 'graze');
-        if (!warmed.has(e.species)) { warmed.add(e.species); renderFrom(renderer, scene, camera, warmStep, 1); } // builds its shadow pipeline now
+        if (!warmed.has(e.species)) { warmed.add(e.species); renderFlightPose(renderer, scene, camera, warmStep, 1); } // builds its shadow pipeline now
       },
     });
     // The GPU finishes some pipeline work a few seconds after a dinosaur joins (measured: one ~400 ms stall about 3.4 s after the
