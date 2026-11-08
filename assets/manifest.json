@@ -54,6 +54,6 @@
     ],
     "files": { "high": "public/models/pachycephalosaurus.high.glb", "low": "public/models/pachycephalosaurus.low.glb" },
     "clips": { "idle": "idle", "walk": "walk" },
-    "status": "candidate"
+    "status": "approved"
   }
 ]
