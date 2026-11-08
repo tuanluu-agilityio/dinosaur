@@ -518,6 +518,45 @@ files: [src/app/loader.ts, src/app/app.ts, tests/e2e/loading.spec.ts]
 ```
 - [ ] Intro starts once renderer + canopy are ready (< 3 s on Fast 3G target for first frame); dinosaurs and far vegetation stream during intro; high-tier dino variant loads on focus. e2e (Review Focus 4): abort one GLB route → that dino hidden + console warn, others clickable; panel shows `loadError` + `retry` for failed content fetch; Slow 3G → intro still plays. Commit `feat(scene): add progressive loading and failure handling`.
 
+### P4-T07 — Bundle splitting for Fast 3G first frame
+```task
+id: P4-T07
+wave: 4
+agent: frontend-dev
+model: sonnet
+area: build
+depends: [P4-T06]
+heavy: false
+files: [vite.config.ts, src/main.ts, src/app/app.ts]
+```
+- [ ] First frame on Fast 3G is 4.04 s (`task-35-net-fast3g.json`); JS finishes loading at 3.05 s and the 235 kB gz three chunk is the long pole. Split the bundle (manual chunks / dynamic import) so the first frame lands in < 3 s on the DevTools Fast 3G preset with a production build. Publish `task-<n>-net-fast3g.json`. Commit `perf(build): split bundle for fast 3g first frame`.
+
+### P4-T08 — Ship the Basis transcoder in production builds
+```task
+id: P4-T08
+wave: 4
+agent: frontend-dev
+model: sonnet
+area: build
+depends: [P4-T06]
+heavy: false
+files: [vite.config.ts, public/basis/**, tests/unit/build-assets.test.ts]
+```
+- [ ] `dino.ts` loads the KTX2 transcoder from `<base>basis/`, but nothing puts it in `dist/`, so models never load from a production build (blocks deploy). Ship the transcoder (copy from three's `examples/jsm/libs/basis` into `public/basis/` or a vite copy step) and add a test that fails when `dist/basis/basis_transcoder.{js,wasm}` is missing after build. Verify a model loads from `vite preview` under `/dinosaur/`. Commit `fix(build): ship basis transcoder in production build`.
+
+### P4-T09 — Credits view reuses the content store
+```task
+id: P4-T09
+wave: 4
+agent: frontend-dev
+model: sonnet
+area: ui
+depends: [P4-T06]
+heavy: false
+files: [src/ui/credits.ts, tests/unit/credits.test.ts]
+```
+- [ ] `src/ui/credits.ts` fetches every species JSON at startup, duplicating `ContentStore` fetches and competing with model downloads. Load credits lazily when the view opens, through `ContentStore`. Unit test: no species fetch before the credits view opens. Commit `perf(ui): load credits lazily via content store`.
+
 ---
 
 ## Wave 5 — Quality and launch
@@ -533,7 +572,7 @@ depends: [P4-T01, P4-T02, P4-T05, P4-T06]
 heavy: true
 files: [docs/perf/results.md, src/core/budgets.ts]
 ```
-- [ ] Run `perf.spec.ts` on all tiers + phone proxy; meet targets; fix by lowering budgets first, code changes second (each a separate commit). Record table in `docs/perf/results.md`. Commit `perf(perf): final tuning to meet targets`.
+- [ ] Run `perf.spec.ts` on all tiers + phone proxy; meet targets; fix by lowering budgets first, code changes second (each a separate commit). Record table in `docs/perf/results.md`. Measure from intro start through `data-ready` as well as steady state (P3 covers species load and focus swap); P4-T06 left a ~400 ms high-tier stall about 3.4 s after a dino joins and an unconfirmed 107 ms phone/medium run. Gate: empty-scene control p95 ≤ 4 ms before any number is trusted. Commit `perf(perf): final tuning to meet targets`.
 
 ### P5-T02 — Scene-wide visual and scientific QA
 ```task
