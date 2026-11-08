@@ -68,6 +68,35 @@ describe('CameraDirector', () => {
     expect(d.controls.maxPolarAngle).toBeLessThan(Math.PI / 2);
   });
 
+  it.each([
+    ['desktop', 1.6, -1 / 3, 0],
+    ['phone', 0.46, 0, 0.5],
+  ])('focus projects the target into the free area (%s) and holds while orbiting', async (_n, aspect, nx, ny) => {
+    const { d, cam } = make();
+    cam.aspect = aspect;
+    cam.updateProjectionMatrix();
+    const obj = new Object3D();
+    obj.position.set(3, 1, -4);
+    const f = d.focus(obj, 5);
+    run(d, 1.7);
+    await f;
+    const ndc = () => {
+      cam.updateMatrixWorld();
+      return obj.position.clone().project(cam);
+    };
+    expect(ndc().x).toBeCloseTo(nx, 3);
+    expect(ndc().y).toBeCloseTo(ny, 3);
+    (d.controls as unknown as { _rotateLeft(a: number): void })._rotateLeft(0.5);
+    run(d, 1);
+    expect(ndc().x).toBeCloseTo(nx, 3);
+    expect(ndc().y).toBeCloseTo(ny, 3);
+    const r = d.returnToForest();
+    run(d, 1.7);
+    await r;
+    d.update(0.1);
+    expect(cam.projectionMatrix.elements[8]).toBeCloseTo(0, 6);
+  });
+
   it('returnToForest restores the forest pose', async () => {
     const { d, cam } = make();
     const pos = cam.position.clone();
