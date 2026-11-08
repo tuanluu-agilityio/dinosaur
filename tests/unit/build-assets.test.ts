@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
@@ -21,4 +21,12 @@ describe('production build assets', () => {
       rmSync(out, { recursive: true, force: true });
     }
   }, 180_000);
+
+  it('keeps public/basis byte-identical to the copy in three', () => {
+    for (const f of ['basis_transcoder.js', 'basis_transcoder.wasm']) {
+      const ours = readFileSync(join(root, 'public', 'basis', f));
+      const theirs = readFileSync(join(root, 'node_modules', 'three', 'examples', 'jsm', 'libs', 'basis', f));
+      expect(ours.equals(theirs), f).toBe(true);
+    }
+  });
 });
