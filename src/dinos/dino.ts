@@ -33,6 +33,8 @@ export function configureDinoLoader(r: WebGPURenderer, opts: { basisPath?: strin
 function getLoader(): GLTFLoader {
   if (loader) return loader;
   if (!renderer) throw new Error('configureDinoLoader(renderer) must be called before Dino.load');
+  // Decode meshopt buffers in workers: a 2-6 MB model decoded on the main thread is a frame hitch (visible on a throttled phone CPU).
+  try { MeshoptDecoder.useWorkers(2); } catch (e) { console.warn('dino: meshopt workers unavailable, decoding on the main thread', String(e)); }
   const ktx2 = new KTX2Loader().setTranscoderPath(basisPath).detectSupport(renderer);
   loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).setKTX2Loader(ktx2);
   return loader;

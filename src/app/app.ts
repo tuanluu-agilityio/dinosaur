@@ -14,7 +14,7 @@ import { Controls } from '../ui/controls';
 import { Credits } from '../ui/credits';
 import { Narrator } from '../audio/narrator';
 import { validateManifest } from '../assets/manifest';
-import { ContentStore, streamDinos, warmFlight, renderFrom, upgradeDino, wantsUpgrade } from './loader';
+import { ContentStore, preloadDinos, streamDinos, warmFlight, renderFrom, upgradeDino, wantsUpgrade } from './loader';
 import type { SpeciesContent, SpeciesId } from '../content/schema';
 import { getLang, onLangChange, t } from '../i18n/i18n';
 import manifestJson from '../../assets/manifest.json';
@@ -99,6 +99,12 @@ export async function createApp(canvas: HTMLCanvasElement): Promise<void> {
     const qp = qualityParams(location.search);
     let tier: QualityTier = qp.tier ?? detectTier({ ...readDeviceCaps(), webgpu: isWebGPU });
 
+    // Models and species text start loading now, behind the loading screen; they join the scene once the intro runs.
+    const manifest = validateManifest(manifestJson).filter((e) => e.status === 'approved');
+    const content = new ContentStore();
+    const countOf = (e: { species: SpeciesId }): number => (e.species === 'triceratops' ? 3 : 1);
+    const preload = preloadDinos(manifest, tier, countOf, content);
+
     const scene = new Scene();
     const camera = new PerspectiveCamera(50, 1, 0.1, 400);
     const atmosphere = new Atmosphere(scene, renderer, { tier, isWebGPU });
@@ -108,8 +114,6 @@ export async function createApp(canvas: HTMLCanvasElement): Promise<void> {
 
     // Dinosaurs: every approved manifest entry; a herd for triceratops, the rest solo.
     // Models and species text stream in after the intro starts (loader.ts); nothing here waits for them.
-    const manifest = validateManifest(manifestJson).filter((e) => e.status === 'approved');
-    const content = new ContentStore();
     const world = new DinoWorld(scene);
     const label = div('dino-label', ui);
     world.label = label;
@@ -303,8 +307,7 @@ export async function createApp(canvas: HTMLCanvasElement): Promise<void> {
     }
     const warmed = new Set<SpeciesId>();
     await streamDinos({
-      renderer, scene, camera, tier, entries: manifest, content,
-      count: (e) => (e.species === 'triceratops' ? 3 : 1),
+      renderer, scene, camera, preload,
       onLoaded: (e, d) => {
         world.add(d, e.species === 'triceratops' ? 'herd' : e.species === 'tyrannosaurus' ? 'wander' : 'graze');
         if (!warmed.has(e.species)) { warmed.add(e.species); renderFrom(renderer, scene, camera, warmStep, 1); } // builds its shadow pipeline now

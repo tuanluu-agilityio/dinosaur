@@ -121,40 +121,52 @@ export async function upgradeDino(renderer: WebGPURenderer, scene: Scene, camera
   return next;
 }
 
+export interface Preload {
+  entries: readonly AssetEntry[];
+  /** One job per entry: the loaded animals (empty when the model failed). */
+  jobs: Promise<Dino[]>[];
+  failed: SpeciesId[];
+}
+
+/**
+ * Starts fetching and parsing every model and content file now and returns at once. Called before the loading screen's warm-up so the
+ * parse/transcode work lands behind the loading screen, not as frame hitches in the intro. A failing model is skipped with a console warning.
+ */
+export function preloadDinos(entries: readonly AssetEntry[], tier: QualityTier, count: (e: AssetEntry) => number, content: ContentStore): Preload {
+  const failed: SpeciesId[] = [];
+  for (const e of entries) content.get(e.species).catch((err: unknown) => console.warn(`content for ${e.species} unavailable`, String(err)));
+  const jobs = entries.map((e) =>
+    // The forest always uses the light variant (smaller upload, cheaper to shade); the tier's detail model loads on focus (upgradeDino).
+    Promise.all(Array.from({ length: count(e) }, () => Dino.load(e, tier, 'low'))).catch((err: unknown) => {
+      console.warn(`model for ${e.species} failed to load; it will not appear`, String(err));
+      failed.push(e.species);
+      return [] as Dino[];
+    }),
+  );
+  return { entries, jobs, failed };
+}
+
 export interface StreamOptions {
   renderer: WebGPURenderer;
   scene: Scene;
   camera: Camera;
-  tier: QualityTier;
-  entries: readonly AssetEntry[];
-  /** How many animals of a species to spawn. */
-  count: (e: AssetEntry) => number;
+  preload: Preload;
   /** Called for each warmed-up animal, in manifest order. */
   onLoaded: (e: AssetEntry, d: Dino) => void;
-  content: ContentStore;
 }
 
 /**
- * Fetches every model and content file in parallel, then adds the dinosaurs one at a time (warmed up, one per frame) in manifest order.
- * Resolves when everything that could load has loaded. A failing model is skipped with a console warning.
+ * Adds the preloaded dinosaurs one at a time (warmed up, one per frame) in manifest order, as each model arrives.
+ * Resolves when everything that could load has loaded.
  */
 export async function streamDinos(o: StreamOptions): Promise<{ loaded: Dino[]; failed: SpeciesId[] }> {
-  const failed: SpeciesId[] = [];
-  for (const e of o.entries) o.content.get(e.species).catch((err: unknown) => console.warn(`content for ${e.species} unavailable`, String(err)));
-  const jobs = o.entries.map((e) => {
-    // The forest always uses the light variant (smaller upload, cheaper to shade); the tier's detail model loads on focus (upgradeDino).
-    return Promise.all(Array.from({ length: o.count(e) }, () => Dino.load(e, o.tier, 'low'))).catch((err: unknown) => {
-      console.warn(`model for ${e.species} failed to load; it will not appear`, String(err));
-      failed.push(e.species);
-      return [] as Dino[];
-    });
-  });
+  const { entries, jobs, failed } = o.preload;
   const loaded: Dino[] = [];
-  for (let i = 0; i < o.entries.length; i++) {
+  for (let i = 0; i < entries.length; i++) {
     const dinos = await jobs[i];
     for (const d of dinos) {
       await warmDino(o.renderer, o.scene, o.camera, d.root);
-      o.onLoaded(o.entries[i], d);
+      o.onLoaded(entries[i], d);
       loaded.push(d);
       await frame();
     }
