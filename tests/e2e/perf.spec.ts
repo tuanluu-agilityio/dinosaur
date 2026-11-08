@@ -51,7 +51,7 @@ interface Result {
   maxMs: number;
   meanFps: number;
   errors: string[];
-  /** Frames over 50 ms: [seconds into the recording, ms]. Tells a one-off hitch from steady jank. */
+  /** Frames over 100 ms (the rubric P3 limit): [seconds into the recording, ms]. Tells a one-off hitch from steady jank. */
   longFrames: [number, number][];
   /** p95 of every run when the scenario is repeated (forest and full rows); the row above is the run with the lowest p95. */
   runsP95Ms?: number[];
@@ -131,7 +131,7 @@ async function measure(browser: Browser, profile: keyof typeof PROFILES, tier: s
   const total = frames.reduce((a, b) => a + b, 0);
   const longFrames: [number, number][] = [];
   let at = 0;
-  for (const f of frames) { at += f; if (f > 50) longFrames.push([round(at / 1000), round(f)]); }
+  for (const f of frames) { at += f; if (f > 100) longFrames.push([round(at / 1000), round(f)]); }
   return {
     scene, profile, tier, query, config: info.config, trexLoaded: info.trexLoaded, frames: frames.length,
     medianMs: round(quantile(sorted, 0.5)), p95Ms: round(quantile(sorted, 0.95)), p99Ms: round(quantile(sorted, 0.99)),
