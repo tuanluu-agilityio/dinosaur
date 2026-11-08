@@ -572,7 +572,7 @@ depends: [P4-T01, P4-T02, P4-T05, P4-T06]
 heavy: true
 files: [docs/perf/results.md, src/core/budgets.ts]
 ```
-- [ ] Run `perf.spec.ts` on all tiers + phone proxy; meet targets; fix by lowering budgets first, code changes second (each a separate commit). Record table in `docs/perf/results.md`. Measure from intro start through `data-ready` as well as steady state (P3 covers species load and focus swap); P4-T06 left a ~400 ms high-tier stall about 3.4 s after a dino joins and an unconfirmed 107 ms phone/medium run. Gate: empty-scene control p95 ≤ 4 ms before any number is trusted. Commit `perf(perf): final tuning to meet targets`.
+- [ ] Run `perf.spec.ts` on all tiers + phone proxy; meet targets; fix by lowering budgets first, code changes second (each a separate commit). Record table in `docs/perf/results.md`. Measure from intro start through `data-ready` as well as steady state (P3 covers species load and focus swap); P4-T06 left a ~400 ms high-tier stall about 3.4 s after a dino joins and an unconfirmed 107 ms phone/medium run. Gate: empty-scene control p95 ≤ 4 ms before any number is trusted. Also publish the evidence final QA found missing: a tier/LOD switch frame strip (V2) and a vegetation sway strip at ≥ 4 fps (V3). Commit `perf(perf): final tuning to meet targets`.
 
 ### P5-T02 — Scene-wide visual and scientific QA
 ```task
@@ -587,6 +587,58 @@ files: [docs/reviews/final-qa.md]
 ```
 - [ ] Capture forest + each close-up on desktop and phone proxy, both languages; grade with `scene.md`, `visual-model.md`, `content.md` (fact-checker re-checks panel text as rendered). Every FAIL becomes a new issue (orchestrator creates, wave 5). Commit `docs(docs): add final qa report`.
 
+### P5-T04 — Godrays must not veil dinosaurs or the intro
+```task
+id: P5-T04
+wave: 5
+agent: perf-engineer
+model: sonnet
+area: scene
+depends: [P5-T02]
+heavy: false
+files: [src/world/godrays.ts]
+```
+- [ ] Final QA (V4, `docs/reviews/final-qa.md`): on desktop high, godray bands wash over the dinosaurs and the intro. Fade the godray strength near the ground and near the camera so the shafts stay in the canopy. Re-shoot `closeup-triceratops-desktop` and a 10 s intro strip at 4 fps (GPU lock around captures). Commit `fix(scene): keep godrays off dinosaurs and intro`.
+
+### P5-T05 — Close-up framing respects the panel
+```task
+id: P5-T05
+wave: 5
+agent: frontend-dev
+model: sonnet
+area: scene
+depends: [P5-T02]
+heavy: false
+files: [src/camera/director.ts, src/app/app.ts, tests/unit/director.test.ts, tests/e2e/closeup.spec.ts]
+```
+- [ ] Final QA (U1): the close-up centres the dinosaur in the full viewport, so the phone bottom sheet hides it and the desktop side panel covers the T. rex head. `CameraDirector.focus` must offset the target into the free area: the left two thirds on desktop, the top half on phone (portrait), and it must hold while orbiting. Add a unit test for the projected target position. Re-shoot all 3 species close-ups plus orbit on desktop and phone. Commit `fix(scene): frame close-ups in the free viewport`.
+
+### P5-T06 — Panel scroll reset and phone Credits overlap
+```task
+id: P5-T06
+wave: 5
+agent: frontend-dev
+model: sonnet
+area: ui
+depends: [P5-T02]
+heavy: false
+files: [src/ui/panel.ts, src/ui/styles.css, src/ui/credits.ts, src/app/app.ts, tests/e2e/panel.spec.ts]
+```
+- [ ] Final QA (U2, U3). U2: `InfoPanel.show()` resets `scrollTop` while the panel is hidden, so it has no effect; reset it after un-hiding. e2e: open A, scroll, back, open B, expect `scrollTop === 0`. U3: on phone the Credits button floats over the open sheet; hide it while the panel is open (or place it under the sheet). e2e checks that it does not overlap the sheet at 390×844. Commit `fix(ui): reset panel scroll and hide credits over sheet`.
+
+### P5-T07 — Quick-fact number format and herbivore glossary
+```task
+id: P5-T07
+wave: 5
+agent: frontend-dev
+model: sonnet
+area: i18n
+depends: [P5-T02]
+heavy: false
+files: [src/ui/panel.ts, src/i18n/ui.json, content/species/pachycephalosaurus.json, tests/unit/i18n.test.ts]
+```
+- [ ] Final QA (C3, L2, L3). Show masses below 1 t in kg (Pachycephalosaurus 370–450 kg, not "0.4–0.5 t"). Format numbers per locale with `Intl.NumberFormat` (vi uses a decimal comma). Give Pachycephalosaurus a length range taken from its cited sources (or render a single value as "~3 m"); any content number change must match the cited source (fact-checker reviews). Change vi `diet.herbivore` to "Ăn cỏ" (glossary). Unit tests cover the formatting for en and vi. Commit `fix(i18n): format quick facts per locale and fix herbivore`.
+
 ### P5-T03 — Launch
 ```task
 id: P5-T03
@@ -594,7 +646,7 @@ wave: 5
 agent: frontend-dev
 model: sonnet
 area: build
-depends: [P5-T01, P5-T02, P4-T08]
+depends: [P5-T01, P5-T02, P4-T08, P5-T04, P5-T05, P5-T06, P5-T07]
 heavy: false
 files: [README.md, docs/known-issues.md]
 ```
