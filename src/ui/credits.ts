@@ -1,21 +1,33 @@
 import manifest from '../../assets/manifest.json';
-import { SPECIES_IDS, type Lang, type SpeciesContent } from '../content/schema';
+import { SPECIES_IDS, type Lang, type SpeciesContent, type SpeciesId } from '../content/schema';
 import { getLang, onLangChange, t } from '../i18n/i18n';
 
 interface ModelEntry {
   species: string; sourceUrl: string; author: string; license: string; modifications: string[]; status: string;
 }
 type SpeciesJson = Pick<SpeciesContent, 'id' | 'commonName' | 'scientificName' | 'sources'>;
+/** The part of `ContentStore` credits needs; sharing the app's store avoids duplicate species fetches. */
+export interface SpeciesSource { get(id: SpeciesId): Promise<SpeciesContent> }
 
-/** Species content is served at <base>content/species/<id>.json (vite content plugin); loaded once. */
-async function loadSpecies(): Promise<SpeciesJson[]> {
-  const out = await Promise.all(SPECIES_IDS.map(async (id) => {
-    try {
-      const r = await fetch(`${import.meta.env.BASE_URL}content/species/${id}.json`);
-      return r.ok ? ((await r.json()) as SpeciesJson) : null;
-    } catch { return null; }
-  }));
-  return out.filter((s): s is SpeciesJson => s !== null);
+/** Species used for the credits list. Nothing is fetched until `load()` runs (first open); a failed species is skipped. */
+export function createSpeciesLoader(getStore: () => Promise<SpeciesSource>): { load(): Promise<SpeciesJson[]> } {
+  let done: Promise<SpeciesJson[]> | null = null;
+  return {
+    load(): Promise<SpeciesJson[]> {
+      done ??= getStore().then(async (store) => {
+        const out = await Promise.all(SPECIES_IDS.map((id) => store.get(id).catch(() => null)));
+        const list = out.filter((s): s is SpeciesContent => s !== null);
+        if (list.length === 0) done = null; // nothing loaded (store not ready or offline): retry on next open
+        return list;
+      }).catch(() => { done = null; return []; });
+      return done;
+    },
+  };
+}
+
+async function ownStore(): Promise<SpeciesSource> {
+  const { ContentStore } = await import('../app/loader');
+  return new ContentStore();
 }
 
 const CC_URLS: Record<string, string> = {
@@ -75,8 +87,11 @@ export class Credits {
   private readonly box: HTMLElement;
   private lang: Lang = getLang();
   private speciesList: SpeciesJson[] = [];
+  private readonly species: { load(): Promise<SpeciesJson[]> };
 
-  constructor(root: HTMLElement) {
+  /** `store` should be the app's shared ContentStore; without it credits creates its own on first open. */
+  constructor(root: HTMLElement, store?: SpeciesSource) {
+    this.species = createSpeciesLoader(() => (store ? Promise.resolve(store) : ownStore()));
     if (!document.getElementById('dino-credits-style')) {
       const s = el('style', undefined, CSS);
       s.id = 'dino-credits-style';
@@ -96,12 +111,12 @@ export class Credits {
     root.append(this.btn, this.dialog);
     onLangChange((l) => { this.lang = l; this.render(); });
     this.render();
-    void loadSpecies().then((l) => { this.speciesList = l; this.render(); });
   }
 
   isOpen(): boolean { return !this.dialog.hidden; }
   open(): void {
     this.dialog.hidden = false;
+    void this.species.load().then((l) => { if (l.length > 0 && this.speciesList.length === 0) { this.speciesList = l; this.render(); if (this.isOpen()) this.box.querySelector<HTMLElement>('button')?.focus(); } });
     this.box.scrollTop = 0;
     window.addEventListener('keydown', this.onKey);
     this.box.querySelector<HTMLElement>('button')?.focus();

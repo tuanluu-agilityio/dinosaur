@@ -6,7 +6,10 @@ const manifest: { species: string; author: string; license: string; sourceUrl: s
 
 const approved = manifest.filter((m) => m.status === 'approved');
 
+const speciesRequests: string[] = [];
+
 async function open(page: Page, w = 1280, h = 800) {
+  page.on('request', (r) => { if (r.url().includes('/content/species/')) speciesRequests.push(r.url()); });
   page.on('console', (m) => { if (m.type() === 'error') throw new Error(`console error: ${m.text()}`); });
   page.on('pageerror', (e) => { throw e; });
   await page.setViewportSize({ width: w, height: h });
@@ -24,6 +27,9 @@ async function open(page: Page, w = 1280, h = 800) {
 test('each approved model appears with author, link and licence; candidates do not', async ({ page }) => {
   await open(page);
   await expect(page.locator('.dino-credits')).toBeHidden();
+  speciesRequests.length = 0;
+  await page.waitForTimeout(500);
+  expect(speciesRequests).toEqual([]);
   await page.locator('.dino-credits-btn').click();
   const dlg = page.locator('.dino-credits__box');
   await expect(dlg).toBeVisible();
@@ -35,7 +41,7 @@ test('each approved model appears with author, link and licence; candidates do n
     await expect(li.locator(`a[href="${m.sourceUrl}"]`)).toHaveCount(1);
     await expect(li.locator('.dino-credits__tag')).toHaveCount(m.modifications.length > 0 ? 1 : 0);
   }
-  await expect(dlg.locator('li[data-species="pachycephalosaurus"]')).toHaveCount(0);
+  for (const m of manifest.filter((e) => e.status !== 'approved')) await expect(dlg.locator(`li[data-species="${m.species}"]`)).toHaveCount(0);
   await expect(dlg).toContainText('felix.blume');
   await expect(dlg).toContainText('Aurelia');
   await expect(dlg).toContainText('MIT');
