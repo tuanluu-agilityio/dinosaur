@@ -2,7 +2,7 @@
 // Each shaft is one instanced quad stretched along the light ray and turned about that axis to face the
 // camera (cylindrical billboard). Anchor, width and shimmer come from hash(instanceIndex) + `time` in
 // TSL; the anchors wrap around the camera so shafts are always nearby. Opacity rises when looking
-// towards the sun, fades with distance (matched to the height fog) and near the lens.
+// towards the sun, fades with distance (matched to the height fog), near the lens and towards the ground (canopy only).
 // High tier only (BUDGETS[tier].godrays). Vertex/fragment only: no compute nodes.
 // Technique after holtsetio/aurelia src/godrays.js + src/background.js @724aba26 (MIT): translucent
 // shaft geometry offset along lightDir, density by view angle and distance, no depth write.
@@ -55,6 +55,7 @@ export class Godrays {
     const vAlong = varying(float(0), 'vShaftAlong');
     const vAcross = varying(float(0), 'vShaftAcross');
     const vStrength = varying(float(0), 'vShaftStrength');
+    const vHeight = varying(float(0), 'vShaftHeight');
 
     material.vertexNode = Fn(() => {
       const id = instanceIndex.mul(5);
@@ -80,10 +81,11 @@ export class Godrays {
       const forward = viewDir.dot(sunDir).max(0);
       const angle = mix(0.2, 1.0, forward.pow(2));
       const dist = toCam.length();
-      const fade = float(1).sub(smoothstep(fadeFar.mul(0.35), fadeFar, dist)).mul(smoothstep(2.0, 7.0, dist));
+      const fade = float(1).sub(smoothstep(fadeFar.mul(0.35), fadeFar, dist)).mul(smoothstep(8.0, 26.0, dist));
       const sway = sin(time.mul(mix(0.15, 0.4, hash(id.add(3)))).add(hash(id.add(4)).mul(TAU))).mul(0.5).add(0.5);
       vStrength.assign(angle.mul(fade).mul(mix(0.35, 1.0, sway)).mul(mix(0.5, 1.0, hash(id.add(2)))));
       vAlong.assign(t);
+      vHeight.assign(world.y);
       vAcross.assign(positionLocal.x.mul(2));
       return cameraProjectionMatrix.mul(cameraViewMatrix).mul(vec4(world, 1));
     })();
@@ -92,7 +94,9 @@ export class Godrays {
     material.opacityNode = Fn(() => {
       const across = float(1).sub(vAcross.mul(vAcross)).max(0).pow(1.5);
       const along = smoothstep(0.0, 0.1, vAlong).mul(float(1).sub(smoothstep(0.82, 0.92, vAlong)));
-      return across.mul(along).mul(vStrength).mul(this.intensity).mul(1.4);
+      // Keep shafts in the canopy: fade out below ~14 m so they never wash over dinosaurs or the ground.
+      const aloft = smoothstep(7.0, 15.0, vHeight);
+      return across.mul(along).mul(aloft).mul(vStrength).mul(this.intensity).mul(1.4);
     })();
 
     this.mesh = new Mesh(geometry, material);
