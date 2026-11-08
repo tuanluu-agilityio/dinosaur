@@ -553,7 +553,7 @@ model: sonnet
 area: ui
 depends: [P4-T06]
 heavy: false
-files: [src/ui/credits.ts, tests/unit/credits.test.ts]
+files: [src/ui/credits.ts, tests/unit/credits.test.ts, tests/e2e/credits.spec.ts]
 ```
 - [ ] `src/ui/credits.ts` fetches every species JSON at startup, duplicating `ContentStore` fetches and competing with model downloads. Load credits lazily when the view opens, through `ContentStore`. Unit test: no species fetch before the credits view opens. Commit `perf(ui): load credits lazily via content store`.
 
@@ -594,7 +594,7 @@ wave: 5
 agent: frontend-dev
 model: sonnet
 area: build
-depends: [P5-T01, P5-T02]
+depends: [P5-T01, P5-T02, P4-T08]
 heavy: false
 files: [README.md, docs/known-issues.md]
 ```
