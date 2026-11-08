@@ -16,7 +16,9 @@ export function createSpeciesLoader(getStore: () => Promise<SpeciesSource>): { l
     load(): Promise<SpeciesJson[]> {
       done ??= getStore().then(async (store) => {
         const out = await Promise.all(SPECIES_IDS.map((id) => store.get(id).catch(() => null)));
-        return out.filter((s): s is SpeciesContent => s !== null);
+        const list = out.filter((s): s is SpeciesContent => s !== null);
+        if (list.length === 0) done = null; // nothing loaded (store not ready or offline): retry on next open
+        return list;
       }).catch(() => { done = null; return []; });
       return done;
     },

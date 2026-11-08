@@ -160,7 +160,7 @@ export async function createApp(canvas: HTMLCanvasElement): Promise<void> {
     const probe = DEV || q.has('test') ? installQualityProbe(quality, renderer) : null;
     const panel = new InfoPanel(ui);
     const controls = new Controls(ui);
-    new Credits(ui);
+    new Credits(ui, { get: (id) => (content ? content.get(id) : Promise.reject(new Error('content not ready'))) }); // shared store, once created
     const narrator = new Narrator();
     const ambient = new Ambient();
     const hint = div('dino-hint', ui);
